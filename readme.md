@@ -1,16 +1,29 @@
 # Schema Warden 
 _Catch database drift before your clients do_
 
+When a tenant database in a database drifts, debugging becomes a nightmare. Clients start blowing up your phone.
+Schema Warden prevents that.
 
-## Work In Progress
-This project is still in development.
+## What is this?
+This is a CLI tool that connects to your database and diffs your schema against a known baseline. 
+If there are any differences, they are printed to the console and the process exits with a non-zero exit code.
 
-There is no documentation, interface, or tests.
 
+## Usage
 
-When a tenant database in a database drifts, debugging becomes a nightmare. Clients start blowing up your phone. 
-This project connects to your database and diffs your schema against a known baseline.
+```
+Usage: schema-warden [OPTIONS] --db-user <DB_USER> --db-pwd <DB_PWD> --baseline-db <BASELINE_DB>
 
+Options:
+  -H, --db-host <DB_HOST>          Hostname or IP address of the SQL Server [env: SCHEMA_WARDEN_DB_HOST=] [default: localhost]
+  -P, --db-port <DB_PORT>          SQL Server's TCP port [env: SCHEMA_WARDEN_DB_PORT=] [default: 1433]
+  -u, --db-user <DB_USER>          SQL Server login username [env: SCHEMA_WARDEN_DB_USER=]
+  -p, --db-pwd <DB_PWD>            SQL Server login password [env: SCHEMA_WARDEN_DB_PWD]
+  -b, --baseline-db <BASELINE_DB>  Name of the database to be treated as the source of truth [env: SCHEMA_WARDEN_BASELINE_DB=]
+  -t, --trust-cert                 Trust the server's cert without verification [env: SCHEMA_WARDEN_TRUST_CERT=]
+  -h, --help                       Print help
+  -V, --version                    Print version
+```
 
 ---
 
