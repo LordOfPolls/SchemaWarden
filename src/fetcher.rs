@@ -5,7 +5,6 @@ use sqlparser::dialect::MsSqlDialect;
 use tiberius::{Client, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::Compat;
-use regex;
 
 use crate::schema::*;
 

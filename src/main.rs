@@ -122,7 +122,7 @@ pub async fn connect(db_name: &str, args: &Args) -> anyhow::Result<Client<Compat
 
 
 pub async fn fetch_tenants(args: &Args) -> anyhow::Result<Vec<String>> {
-    let mut client = connect("master", &args).await?;
+    let mut client = connect("master", args).await?;
 
     let sql = "
         SELECT name

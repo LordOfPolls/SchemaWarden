@@ -358,19 +358,18 @@ fn diff_modules(
         }
     }
     for (key, b) in baseline {
-        if let Some(t) = target.get(key) {
-            if b.definition != t.definition {
-                changes.push(ModuleChange {
-                    key: key.clone(),
-                    kind: ModuleChangeKind::DefinitionChanged {
-                        baseline: b.definition.clone(),
-                        target: t.definition.clone(),
-                    },
-                });
-            }
+        if let Some(t) = target.get(key)
+            && b.definition != t.definition
+        {
+            changes.push(ModuleChange {
+                key: key.clone(),
+                kind: ModuleChangeKind::DefinitionChanged {
+                    baseline: b.definition.clone(),
+                    target: t.definition.clone(),
+                },
+            });
         }
     }
-
     changes.sort_by(|a, b| a.key.cmp(&b.key));
     changes
 }
