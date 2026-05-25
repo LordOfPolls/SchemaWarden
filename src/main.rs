@@ -10,23 +10,30 @@ use clap::Parser;
 
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about = "Schema drift detection for multi-tenant MSSQL databases")]
 pub struct Args {
-    #[clap(short = 'H', long, default_value = "localhost", env = "SCHEMA_WARDEN_DB_HOST")]
+    #[clap(short = 'H', long, default_value = "localhost", env = "SCHEMA_WARDEN_DB_HOST",
+        help = "Hostname or IP address of the SQL Server")]
     db_host: String,
 
-    #[clap(short = 'P', long, default_value = "1433", env = "SCHEMA_WARDEN_DB_PORT")]
+    #[clap(short = 'P', long, default_value = "1433", env = "SCHEMA_WARDEN_DB_PORT",
+        help = "SQL Server's TCP port")]
     db_port: u16,
 
-    #[clap(long, short = 'u', env = "SCHEMA_WARDEN_DB_USER")]
+    #[clap(long, short = 'u', env = "SCHEMA_WARDEN_DB_USER",
+        help = "SQL Server login username")]
     db_user: String,
-    #[clap(long, short = 'p', env = "SCHEMA_WARDEN_DB_PWD", hide_env_values = true)]
+
+    #[clap(long, short = 'p', env = "SCHEMA_WARDEN_DB_PWD", hide_env_values = true,
+        help = "SQL Server login password")]
     db_pwd: String,
 
-    #[clap(long, short, env = "SCHEMA_WARDEN_BASELINE_DB")]
+    #[clap(long, short, env = "SCHEMA_WARDEN_BASELINE_DB",
+        help = "Name of the database to be treated as the source of truth")]
     baseline_db: String,
 
-    #[clap(long, short, env = "SCHEMA_WARDEN_TRUST_CERT")]
+    #[clap(long, short, env = "SCHEMA_WARDEN_TRUST_CERT",
+        help = "Trust the server's cert without verification")]
     trust_cert: bool,
 }
 
