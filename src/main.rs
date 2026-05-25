@@ -33,7 +33,7 @@ pub struct Args {
     baseline_db: String,
 
     #[clap(long, short, env = "SCHEMA_WARDEN_EXCLUDE_DATABASES",
-        help = "List of databases to exclude from the comparison, separated by commas",
+        help = "Database to exclude from the comparison",
     )]
     exclude_databases: Vec<String>,
 
