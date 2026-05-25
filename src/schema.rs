@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct DatabaseSchema {
     pub db_name: String,
@@ -23,6 +24,7 @@ impl DatabaseSchema {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TableDef {
     pub schema: String,
@@ -46,6 +48,7 @@ impl TableDef {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub name: String,
@@ -59,6 +62,7 @@ pub struct ColumnDef {
     pub is_identity: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct IndexDef {
     pub name: String,
@@ -68,6 +72,7 @@ pub struct IndexDef {
     pub columns: Vec<IndexColumnRef>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct IndexColumnRef {
     pub name: String,
@@ -75,6 +80,7 @@ pub struct IndexColumnRef {
     pub is_included: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyDef {
     pub name: String,
@@ -86,12 +92,14 @@ pub struct ForeignKeyDef {
     pub on_update: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct CheckConstraintDef {
     pub name: String,
     pub definition: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ModuleDef {
     pub schema: String,
@@ -100,6 +108,7 @@ pub struct ModuleDef {
     pub definition: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObjectType {
     View,
