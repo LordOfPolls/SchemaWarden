@@ -1,3 +1,4 @@
+mod diff;
 mod fetcher;
 mod schema;
 
@@ -7,25 +8,24 @@ use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 const BASELINE_DB: &str = "baseline_db";
-const DB_1: &str = "tenant1_db";
-const DB_2: &str = "tenant2_db";
+const TENANT_DBS: &[&str] = &["tenant1_db", "tenant2_db"];
 const PWD: &str = "SchemaWarden_Dev1";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    for db in [BASELINE_DB, DB_1, DB_2] {
-        let mut client = connect(db).await?;
-        let schema = fetcher::fetch_schema(&mut client, db).await?;
+    let mut baseline_client = connect(BASELINE_DB).await?;
+    let baseline = fetcher::fetch_schema(&mut baseline_client, BASELINE_DB).await?;
 
-        println!(
-            "{}: {} tables, {} views, {} procs, {} functions, {} triggers",
-            schema.db_name,
-            schema.tables.len(),
-            schema.views.len(),
-            schema.procedures.len(),
-            schema.functions.len(),
-            schema.triggers.len(),
-        );
+    for &db in TENANT_DBS {
+        let mut client = connect(db).await?;
+        let tenant = fetcher::fetch_schema(&mut client, db).await?;
+        let drift = diff::diff(&baseline, &tenant);
+
+        if drift.is_clean() {
+            println!("{db}: no drift detected");
+        } else {
+            println!("{drift}");
+        }
     }
 
     Ok(())
