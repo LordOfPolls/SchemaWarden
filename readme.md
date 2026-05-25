@@ -5,7 +5,7 @@ When a tenant database in a database drifts, debugging becomes a nightmare. Clie
 Schema Warden prevents that.
 
 ## What is this?
-This is a CLI tool that connects to your database and diffs your schema against a known baseline. 
+This is a CLI tool that connects to your **MSSQL** database and diffs your schema against a known baseline. 
 If there are any differences, they are printed to the console and the process exits with a non-zero exit code.
 
 
