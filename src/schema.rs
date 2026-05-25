@@ -1,7 +1,6 @@
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct DatabaseSchema {
     pub db_name: String,
     pub tables: IndexMap<String, TableDef>,
@@ -24,7 +23,7 @@ impl DatabaseSchema {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct TableDef {
     pub schema: String,
     pub name: String,
@@ -47,7 +46,7 @@ impl TableDef {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub name: String,
     pub ordinal: i32,
@@ -60,7 +59,7 @@ pub struct ColumnDef {
     pub is_identity: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct IndexDef {
     pub name: String,
     pub is_unique: bool,
@@ -69,14 +68,14 @@ pub struct IndexDef {
     pub columns: Vec<IndexColumnRef>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct IndexColumnRef {
     pub name: String,
     pub is_descending: bool,
     pub is_included: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ForeignKeyDef {
     pub name: String,
     pub columns: Vec<String>,
@@ -87,13 +86,13 @@ pub struct ForeignKeyDef {
     pub on_update: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CheckConstraintDef {
     pub name: String,
     pub definition: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ModuleDef {
     pub schema: String,
     pub name: String,
@@ -101,7 +100,7 @@ pub struct ModuleDef {
     pub definition: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObjectType {
     View,
     StoredProcedure,

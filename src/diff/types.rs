@@ -1,10 +1,8 @@
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
-
 use crate::schema::IndexColumnRef;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct SchemaDiff {
     pub baseline_db: String,
     pub target_db: String,
@@ -25,20 +23,20 @@ impl SchemaDiff {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct TableChange {
     pub key: String,
     pub kind: TableChangeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum TableChangeKind {
     Added,
     Removed,
     Modified(TableBodyDiff),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TableBodyDiff {
     pub columns: Vec<ColumnChange>,
     pub indexes: Vec<IndexChange>,
@@ -55,20 +53,20 @@ impl TableBodyDiff {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ColumnChange {
     pub name: String,
     pub kind: ColumnChangeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ColumnChangeKind {
     Added,
     Removed,
     Modified(Vec<ColumnField>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ColumnField {
     DataType {
         baseline: String,
@@ -120,20 +118,20 @@ impl fmt::Display for ColumnField {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct IndexChange {
     pub name: String,
     pub kind: IndexChangeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum IndexChangeKind {
     Added,
     Removed,
     Modified(Vec<IndexField>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum IndexField {
     Unique {
         baseline: bool,
@@ -149,20 +147,20 @@ pub enum IndexField {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct FkChange {
     pub name: String,
     pub kind: FkChangeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum FkChangeKind {
     Added,
     Removed,
     Modified(Vec<FkField>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum FkField {
     Columns {
         baseline: Vec<String>,
@@ -186,26 +184,26 @@ pub enum FkField {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ConstraintChange {
     pub name: String,
     pub kind: ConstraintChangeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ConstraintChangeKind {
     Added,
     Removed,
     DefinitionChanged { baseline: String, target: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ModuleChange {
     pub key: String,
     pub kind: ModuleChangeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ModuleChangeKind {
     Added,
     Removed,
