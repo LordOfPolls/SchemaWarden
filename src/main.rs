@@ -40,15 +40,28 @@ pub struct Args {
     #[clap(long, short, env = "SCHEMA_WARDEN_TRUST_CERT",
         help = "Trust the server's cert without verification")]
     trust_cert: bool,
+
+    #[clap(long, short, env = "SCHEMA_WARDEN_OBJECT",
+        help = "Limit diff to a single object")]
+    object: Option<String>,
+}
+
+fn parse_object_filter(s: &str) -> (String, String) {
+    match s.split_once('.') {
+        Some((schema, name)) => (schema.to_owned(), name.to_owned()),
+        None => ("dbo".to_owned(), s.to_owned()),
+    }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    let filter = args.object.as_deref().map(parse_object_filter);
+    let filter_ref = filter.as_ref().map(|(s, n)| (s.as_str(), n.as_str()));
 
     let mut baseline_client = connect(&args.baseline_db, &args).await?;
-    let baseline = fetcher::fetch_schema(&mut baseline_client, &args.baseline_db).await?;
+    let baseline = fetcher::fetch_schema(&mut baseline_client, &args.baseline_db, filter_ref).await?;
 
     let tenants = fetch_tenants(&args).await?;
     let mut exit_code = 0;
@@ -59,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         let mut client = connect(&db, &args).await?;
-        let tenant = fetcher::fetch_schema(&mut client, &db).await?;
+        let tenant = fetcher::fetch_schema(&mut client, &db, filter_ref).await?;
         let drift = diff::diff(&baseline, &tenant);
 
         if drift.is_clean() {

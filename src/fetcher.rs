@@ -17,22 +17,23 @@ static AUTO_GEN_INDEX_REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLo
 pub async fn fetch_schema(
     client: &mut Client<Compat<TcpStream>>,
     db_name: &str,
+    filter: Option<(&str, &str)>,
 ) -> anyhow::Result<DatabaseSchema> {
     let mut schema = DatabaseSchema::new(db_name);
 
-    fetch_columns(client, &mut schema.tables)
+    fetch_columns(client, &mut schema.tables, filter)
         .await
         .context("fetching columns")?;
-    fetch_indexes(client, &mut schema.tables)
+    fetch_indexes(client, &mut schema.tables, filter)
         .await
         .context("fetching indexes")?;
-    fetch_foreign_keys(client, &mut schema.tables)
+    fetch_foreign_keys(client, &mut schema.tables, filter)
         .await
         .context("fetching foreign keys")?;
-    fetch_check_constraints(client, &mut schema.tables)
+    fetch_check_constraints(client, &mut schema.tables, filter)
         .await
         .context("fetching check constraints")?;
-    fetch_sql_modules(client, &mut schema)
+    fetch_sql_modules(client, &mut schema, filter)
         .await
         .context("fetching SQL modules")?;
 
@@ -42,8 +43,14 @@ pub async fn fetch_schema(
 async fn fetch_columns(
     client: &mut Client<Compat<TcpStream>>,
     tables: &mut IndexMap<String, TableDef>,
+    filter: Option<(&str, &str)>,
 ) -> anyhow::Result<()> {
-    let sql = "
+    let where_clause = if filter.is_some() {
+        "WHERE c.TABLE_SCHEMA = @P1 AND c.TABLE_NAME = @P2"
+    } else {
+        ""
+    };
+    let sql = format!("
         SELECT c.TABLE_SCHEMA
             ,c.TABLE_NAME
             ,c.COLUMN_NAME
@@ -59,12 +66,18 @@ async fn fetch_columns(
         INNER JOIN sys.columns sc ON sc.object_id = OBJECT_ID(QUOTENAME(c.TABLE_SCHEMA) + '.' + QUOTENAME(c.TABLE_NAME))
             AND sc.name = c.COLUMN_NAME
         INNER JOIN sys.tables st ON st.object_id = sc.object_id
+        {where_clause}
         ORDER BY c.TABLE_SCHEMA
             ,c.TABLE_NAME
             ,c.ORDINAL_POSITION
-    ";
+    ");
 
-    let rows = Query::new(sql)
+    let mut query = Query::new(sql);
+    if let Some((schema, name)) = filter {
+        query.bind(schema);
+        query.bind(name);
+    }
+    let rows = query
         .query(client)
         .await?
         .into_first_result()
@@ -107,8 +120,14 @@ async fn fetch_columns(
 async fn fetch_indexes(
     client: &mut Client<Compat<TcpStream>>,
     tables: &mut IndexMap<String, TableDef>,
+    filter: Option<(&str, &str)>,
 ) -> anyhow::Result<()> {
-    let sql = "
+    let filter_clause = if filter.is_some() {
+        "AND s.name = @P1 AND t.name = @P2"
+    } else {
+        ""
+    };
+    let sql = format!("
         SELECT s.name AS schema_name
             ,t.name AS table_name
             ,i.name AS index_name
@@ -131,13 +150,19 @@ async fn fetch_indexes(
             AND c.column_id = ic.column_id
         WHERE i.name IS NOT NULL
             AND i.type > 0
+            {filter_clause}
         ORDER BY s.name
             ,t.name
             ,i.name
             ,ic.key_ordinal
-    ";
+    ");
 
-    let rows = Query::new(sql)
+    let mut query = Query::new(sql);
+    if let Some((schema, name)) = filter {
+        query.bind(schema);
+        query.bind(name);
+    }
+    let rows = query
         .query(client)
         .await?
         .into_first_result()
@@ -187,8 +212,14 @@ async fn fetch_indexes(
 async fn fetch_foreign_keys(
     client: &mut Client<Compat<TcpStream>>,
     tables: &mut IndexMap<String, TableDef>,
+    filter: Option<(&str, &str)>,
 ) -> anyhow::Result<()> {
-    let sql = "
+    let where_clause = if filter.is_some() {
+        "WHERE s.name = @P1 AND t.name = @P2"
+    } else {
+        ""
+    };
+    let sql = format!("
         SELECT s.name AS schema_name
             ,t.name AS table_name
             ,fk.name AS fk_name
@@ -208,13 +239,19 @@ async fn fetch_foreign_keys(
         INNER JOIN sys.schemas rs ON rs.schema_id = rt.schema_id
         INNER JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id
             AND rc.column_id = fkc.referenced_column_id
+        {where_clause}
         ORDER BY s.name
             ,t.name
             ,fk.name
             ,fkc.constraint_column_id
-    ";
+    ");
 
-    let rows = Query::new(sql)
+    let mut query = Query::new(sql);
+    if let Some((schema, name)) = filter {
+        query.bind(schema);
+        query.bind(name);
+    }
+    let rows = query
         .query(client)
         .await?
         .into_first_result()
@@ -259,8 +296,14 @@ async fn fetch_foreign_keys(
 async fn fetch_check_constraints(
     client: &mut Client<Compat<TcpStream>>,
     tables: &mut IndexMap<String, TableDef>,
+    filter: Option<(&str, &str)>,
 ) -> anyhow::Result<()> {
-    let sql = "
+    let where_clause = if filter.is_some() {
+        "WHERE s.name = @P1 AND t.name = @P2"
+    } else {
+        ""
+    };
+    let sql = format!("
         SELECT s.name AS schema_name
             ,t.name AS table_name
             ,cc.name AS constraint_name
@@ -268,12 +311,18 @@ async fn fetch_check_constraints(
         FROM sys.check_constraints cc
         INNER JOIN sys.tables t ON t.object_id = cc.parent_object_id
         INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+        {where_clause}
         ORDER BY s.name
             ,t.name
             ,cc.name
-            ";
+    ");
 
-    let rows = Query::new(sql)
+    let mut query = Query::new(sql);
+    if let Some((schema, name)) = filter {
+        query.bind(schema);
+        query.bind(name);
+    }
+    let rows = query
         .query(client)
         .await?
         .into_first_result()
@@ -300,8 +349,14 @@ async fn fetch_check_constraints(
 async fn fetch_sql_modules(
     client: &mut Client<Compat<TcpStream>>,
     schema: &mut DatabaseSchema,
+    filter: Option<(&str, &str)>,
 ) -> anyhow::Result<()> {
-    let sql = "
+    let filter_clause = if filter.is_some() {
+        "AND s.name = @P1 AND o.name = @P2"
+    } else {
+        ""
+    };
+    let sql = format!("
         SELECT s.name AS schema_name
             ,o.name AS object_name
             ,o.type_desc
@@ -317,12 +372,18 @@ async fn fetch_sql_modules(
                 ,'TF'
                 ,'TR'
                 )
+            {filter_clause}
         ORDER BY o.type
             ,s.name
             ,o.name
-    ";
+    ");
 
-    let rows = Query::new(sql)
+    let mut query = Query::new(sql);
+    if let Some((sch, name)) = filter {
+        query.bind(sch);
+        query.bind(name);
+    }
+    let rows = query
         .query(client)
         .await?
         .into_first_result()

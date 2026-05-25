@@ -29,6 +29,8 @@ Options:
           List of databases to exclude from the comparison, separated by commas [env: SCHEMA_WARDEN_EXCLUDE_DATABASES=]
   -t, --trust-cert
           Trust the server's cert without verification [env: SCHEMA_WARDEN_TRUST_CERT=]
+  -o, --object <OBJECT>
+          Limit diff to a single object, e.g. dbo.MyTable or MyProc (schema defaults to dbo) [env: SCHEMA_WARDEN_OBJECT=]
   -h, --help
           Print help
   -V, --version
