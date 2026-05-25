@@ -41,6 +41,10 @@ async fn main() -> anyhow::Result<()> {
     let tenants = fetch_tenants(&args).await?;
 
     for db in tenants {
+        if db == args.baseline_db {
+            continue;
+        }
+
         let mut client = connect(&db, &args).await?;
         let tenant = fetcher::fetch_schema(&mut client, &db).await?;
         let drift = diff::diff(&baseline, &tenant);
