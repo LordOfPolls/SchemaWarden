@@ -333,8 +333,16 @@ async fn fetch_sql_modules(
 
         let try_ast = Parser::parse_sql(&DIALECT, &definition);
 
+        // Should normalise defs for whitespace and comments
+        // if parser fails, try a dumber cleanup
         if let Ok(ast) = try_ast {
            definition = ast[0].to_string();
+        }else{
+            definition = definition.lines()
+                .map(str::trim)
+                .filter(|line| !line.starts_with("--") && !line.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
         }
 
         let module = ModuleDef {
