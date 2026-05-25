@@ -46,6 +46,7 @@ async fn main() -> anyhow::Result<()> {
     let baseline = fetcher::fetch_schema(&mut baseline_client, &args.baseline_db).await?;
 
     let tenants = fetch_tenants(&args).await?;
+    let mut exit_code = 0;
 
     for db in tenants {
         if db == args.baseline_db {
@@ -60,10 +61,11 @@ async fn main() -> anyhow::Result<()> {
             println!("{db}: no drift detected");
         } else {
             println!("{drift}");
+            exit_code = 1;
         }
     }
 
-    Ok(())
+    std::process::exit(exit_code);
 }
 
 pub async fn connect(db_name: &str, args: &Args) -> anyhow::Result<Client<Compat<TcpStream>>> {
