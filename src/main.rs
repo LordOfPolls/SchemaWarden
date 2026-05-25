@@ -6,19 +6,42 @@ use anyhow::Context;
 use tiberius::{AuthMethod, Client, Config, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
+use clap::Parser;
 
-const BASELINE_DB: &str = "baseline_db";
-const PWD: &str = "SchemaWarden_Dev1";
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub struct Args {
+    #[clap(short = 'H', long, default_value = "localhost", env = "SCHEMA_WARDEN_DB_HOST")]
+    db_host: String,
+
+    #[clap(short = 'P', long, default_value = "1433", env = "SCHEMA_WARDEN_DB_PORT")]
+    db_port: u16,
+
+    #[clap(long, short = 'u', env = "SCHEMA_WARDEN_DB_USER")]
+    db_user: String,
+    #[clap(long, short = 'p', env = "SCHEMA_WARDEN_DB_PWD", hide_env_values = true)]
+    db_pwd: String,
+
+    #[clap(long, short, env = "SCHEMA_WARDEN_BASELINE_DB")]
+    baseline_db: String,
+
+    #[clap(long, short, env = "SCHEMA_WARDEN_TRUST_CERT")]
+    trust_cert: bool,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut baseline_client = connect(BASELINE_DB).await?;
-    let baseline = fetcher::fetch_schema(&mut baseline_client, BASELINE_DB).await?;
+    let args = Args::parse();
 
-    let tenants = fetch_tenants().await?;
+
+    let mut baseline_client = connect(&args.baseline_db, &args).await?;
+    let baseline = fetcher::fetch_schema(&mut baseline_client, &args.baseline_db).await?;
+
+    let tenants = fetch_tenants(&args).await?;
 
     for db in tenants {
-        let mut client = connect(&db).await?;
+        let mut client = connect(&db, &args).await?;
         let tenant = fetcher::fetch_schema(&mut client, &db).await?;
         let drift = diff::diff(&baseline, &tenant);
 
@@ -32,12 +55,15 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn connect(db_name: &str) -> anyhow::Result<Client<Compat<TcpStream>>> {
+pub async fn connect(db_name: &str, args: &Args) -> anyhow::Result<Client<Compat<TcpStream>>> {
     let mut config = Config::new();
-    config.host("localhost");
-    config.port(1433);
-    config.authentication(AuthMethod::sql_server("SA", PWD));
-    config.trust_cert();
+    config.host(args.db_host.clone());
+    config.port(args.db_port);
+    config.authentication(AuthMethod::sql_server(args.db_user.clone(), args.db_pwd.clone()));
+
+    if args.trust_cert {
+        config.trust_cert();
+    }
     config.database(db_name);
 
     let tcp = TcpStream::connect(config.get_addr()).await?;
@@ -49,8 +75,8 @@ pub async fn connect(db_name: &str) -> anyhow::Result<Client<Compat<TcpStream>>>
 }
 
 
-pub async fn fetch_tenants() -> anyhow::Result<Vec<String>> {
-    let mut client = connect("MASTER").await?;
+pub async fn fetch_tenants(args: &Args) -> anyhow::Result<Vec<String>> {
+    let mut client = connect("master", &args).await?;
 
     let sql = "
         SELECT name
