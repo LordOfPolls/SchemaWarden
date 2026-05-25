@@ -2,7 +2,7 @@
 _Catch database drift before your clients do_
 
 
-When a tenant database in a database drifts debugging becomes a nightmare. Clients start blowing up your phone. 
+When a tenant database in a database drifts, debugging becomes a nightmare. Clients start blowing up your phone. 
 This project connects to your database and diffs your schema against a known baseline.
 
 
