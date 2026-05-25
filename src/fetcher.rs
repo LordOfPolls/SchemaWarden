@@ -13,6 +13,12 @@ const DIALECT: MsSqlDialect = MsSqlDialect {};
 static AUTO_GEN_INDEX_REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
     regex::Regex::new(r"^PK__.+__[A-F0-9]{16}$").unwrap()
 });
+static BLOCK_COMMENT_REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"(?s)/\*.*?\*/").unwrap()
+});
+static WHITESPACE_REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"\s+").unwrap()
+});
 
 pub async fn fetch_schema(
     client: &mut Client<Compat<TcpStream>>,
@@ -408,9 +414,11 @@ async fn fetch_sql_modules(
         if let Ok(ast) = try_ast {
            definition = ast.iter().map(ToString::to_string).collect::<Vec<_>>().join(";\n");
         }else{
-            definition = definition.lines()
+            let without_blocks = BLOCK_COMMENT_REG.replace_all(&definition, " ");
+            definition = without_blocks.lines()
                 .map(str::trim)
                 .filter(|line| !line.starts_with("--") && !line.is_empty())
+                .map(|line| WHITESPACE_REG.replace_all(line, " ").into_owned())
                 .collect::<Vec<_>>()
                 .join("\n")
         }
