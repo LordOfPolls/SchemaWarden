@@ -32,6 +32,11 @@ pub struct Args {
         help = "Name of the database to be treated as the source of truth")]
     baseline_db: String,
 
+    #[clap(long, short, env = "SCHEMA_WARDEN_EXCLUDE_DATABASES",
+        help = "List of databases to exclude from the comparison, separated by commas",
+    )]
+    exclude_databases: Vec<String>,
+
     #[clap(long, short, env = "SCHEMA_WARDEN_TRUST_CERT",
         help = "Trust the server's cert without verification")]
     trust_cert: bool,
@@ -49,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     let mut exit_code = 0;
 
     for db in tenants {
-        if db == args.baseline_db {
+        if db == args.baseline_db || args.exclude_databases.contains(&db) {
             continue;
         }
 

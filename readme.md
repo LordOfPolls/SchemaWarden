@@ -15,14 +15,24 @@ If there are any differences, they are printed to the console and the process ex
 Usage: schema-warden [OPTIONS] --db-user <DB_USER> --db-pwd <DB_PWD> --baseline-db <BASELINE_DB>
 
 Options:
-  -H, --db-host <DB_HOST>          Hostname or IP address of the SQL Server [env: SCHEMA_WARDEN_DB_HOST=] [default: localhost]
-  -P, --db-port <DB_PORT>          SQL Server's TCP port [env: SCHEMA_WARDEN_DB_PORT=] [default: 1433]
-  -u, --db-user <DB_USER>          SQL Server login username [env: SCHEMA_WARDEN_DB_USER=]
-  -p, --db-pwd <DB_PWD>            SQL Server login password [env: SCHEMA_WARDEN_DB_PWD]
-  -b, --baseline-db <BASELINE_DB>  Name of the database to be treated as the source of truth [env: SCHEMA_WARDEN_BASELINE_DB=]
-  -t, --trust-cert                 Trust the server's cert without verification [env: SCHEMA_WARDEN_TRUST_CERT=]
-  -h, --help                       Print help
-  -V, --version                    Print version
+  -H, --db-host <DB_HOST>
+          Hostname or IP address of the SQL Server [env: SCHEMA_WARDEN_DB_HOST=] [default: localhost]
+  -P, --db-port <DB_PORT>
+          SQL Server's TCP port [env: SCHEMA_WARDEN_DB_PORT=] [default: 1433]
+  -u, --db-user <DB_USER>
+          SQL Server login username [env: SCHEMA_WARDEN_DB_USER=]
+  -p, --db-pwd <DB_PWD>
+          SQL Server login password [env: SCHEMA_WARDEN_DB_PWD]
+  -b, --baseline-db <BASELINE_DB>
+          Name of the database to be treated as the source of truth [env: SCHEMA_WARDEN_BASELINE_DB=]
+  -e, --exclude-databases <EXCLUDE_DATABASES>
+          List of databases to exclude from the comparison, separated by commas [env: SCHEMA_WARDEN_EXCLUDE_DATABASES=]
+  -t, --trust-cert
+          Trust the server's cert without verification [env: SCHEMA_WARDEN_TRUST_CERT=]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 ```
 
 ---
