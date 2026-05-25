@@ -26,11 +26,13 @@ Options:
   -b, --baseline-db <BASELINE_DB>
           Name of the database to be treated as the source of truth [env: SCHEMA_WARDEN_BASELINE_DB=]
   -e, --exclude-databases <EXCLUDE_DATABASES>
-          List of databases to exclude from the comparison, separated by commas [env: SCHEMA_WARDEN_EXCLUDE_DATABASES=]
+          Database to exclude from the comparison [env: SCHEMA_WARDEN_EXCLUDE_DATABASES=]
   -t, --trust-cert
           Trust the server's cert without verification [env: SCHEMA_WARDEN_TRUST_CERT=]
   -o, --object <OBJECT>
-          Limit diff to a single object, e.g. dbo.MyTable or MyProc (schema defaults to dbo) [env: SCHEMA_WARDEN_OBJECT=]
+          Limit diff to a single object [env: SCHEMA_WARDEN_OBJECT=]
+  -c, --concurrency <CONCURRENCY>
+          Maximum number of tenant databases to scan in parallel [env: SCHEMA_WARDEN_CONCURRENCY=] [default: 4]
   -h, --help
           Print help
   -V, --version

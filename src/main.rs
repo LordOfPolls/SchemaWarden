@@ -3,6 +3,7 @@ mod fetcher;
 mod schema;
 
 use anyhow::Context;
+use futures::stream::{self, StreamExt, TryStreamExt};
 use tiberius::{AuthMethod, Client, Config, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
@@ -44,6 +45,10 @@ pub struct Args {
     #[clap(long, short, env = "SCHEMA_WARDEN_OBJECT",
         help = "Limit diff to a single object")]
     object: Option<String>,
+
+    #[clap(long, short = 'c', default_value_t = 4, env = "SCHEMA_WARDEN_CONCURRENCY",
+        help = "Maximum number of tenant databases to scan in parallel")]
+    concurrency: usize,
 }
 
 fn parse_object_filter(s: &str) -> (String, String) {
@@ -64,25 +69,35 @@ async fn main() -> anyhow::Result<()> {
     let baseline = fetcher::fetch_schema(&mut baseline_client, &args.baseline_db, filter_ref).await?;
 
     let tenants = fetch_tenants(&args).await?;
-    let mut exit_code = 0;
+    let concurrency = args.concurrency.max(1);
 
-    for db in tenants {
-        if db == args.baseline_db || args.exclude_databases.contains(&db) {
-            continue;
+    let drifts: Vec<bool> = stream::iter(
+        tenants
+            .into_iter()
+            .filter(|db| db != &args.baseline_db && !args.exclude_databases.contains(db)),
+    )
+    .map(|db| {
+        let baseline = &baseline;
+        let args = &args;
+        async move {
+            let mut client = connect(&db, args).await?;
+            let tenant = fetcher::fetch_schema(&mut client, &db, filter_ref).await?;
+            let drift = diff::diff(baseline, &tenant);
+
+            if drift.is_clean() {
+                println!("{db}: no drift detected");
+                Ok::<bool, anyhow::Error>(false)
+            } else {
+                println!("{drift}");
+                Ok::<bool, anyhow::Error>(true)
+            }
         }
+    })
+    .buffer_unordered(concurrency)
+    .try_collect()
+    .await?;
 
-        let mut client = connect(&db, &args).await?;
-        let tenant = fetcher::fetch_schema(&mut client, &db, filter_ref).await?;
-        let drift = diff::diff(&baseline, &tenant);
-
-        if drift.is_clean() {
-            println!("{db}: no drift detected");
-        } else {
-            println!("{drift}");
-            exit_code = 1;
-        }
-    }
-
+    let exit_code = if drifts.iter().any(|&d| d) { 1 } else { 0 };
     std::process::exit(exit_code);
 }
 
