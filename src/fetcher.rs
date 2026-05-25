@@ -406,7 +406,7 @@ async fn fetch_sql_modules(
         // Should normalise defs for whitespace and comments
         // if parser fails, try a dumber cleanup
         if let Ok(ast) = try_ast {
-           definition = ast[0].to_string();
+           definition = ast.iter().map(ToString::to_string).collect::<Vec<_>>().join(";\n");
         }else{
             definition = definition.lines()
                 .map(str::trim)
