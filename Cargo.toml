@@ -12,3 +12,4 @@ tokio-util = { version = "0.7", features = ["compat"] }
 anyhow = "1"
 indexmap = { version = "2", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
+sqlparser = {version = "0.*"}

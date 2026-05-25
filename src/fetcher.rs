@@ -1,10 +1,14 @@
 use anyhow::Context;
 use indexmap::IndexMap;
+use sqlparser::parser::Parser;
+use sqlparser::dialect::MsSqlDialect;
 use tiberius::{Client, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::Compat;
 
 use crate::schema::*;
+
+const DIALECT: MsSqlDialect = MsSqlDialect {};
 
 pub async fn fetch_schema(
     client: &mut Client<Compat<TcpStream>>,
@@ -319,13 +323,20 @@ async fn fetch_sql_modules(
         let schema_name = row.get::<&str, _>(0).unwrap_or("").to_owned();
         let object_name = row.get::<&str, _>(1).unwrap_or("").to_owned();
         let type_desc = row.get::<&str, _>(2).unwrap_or("");
-        let definition = row.get::<&str, _>(3).unwrap_or("").to_owned();
+        let mut definition = row.get::<&str, _>(3).unwrap_or("").to_owned();
 
         let Some(object_type) = ObjectType::from_type_desc(type_desc) else {
             continue;
         };
 
         let key = format!("{}.{}", schema_name, object_name);
+
+        let try_ast = Parser::parse_sql(&DIALECT, &definition);
+
+        if let Ok(ast) = try_ast {
+           definition = ast[0].to_string();
+        }
+
         let module = ModuleDef {
             schema: schema_name,
             name: object_name,
