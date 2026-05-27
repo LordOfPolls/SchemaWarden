@@ -42,14 +42,14 @@ impl FromStr for ServerHost {
 #[command(version, about = "Schema drift detection for multi-tenant MSSQL databases")]
 pub struct Args {
     #[clap(short = 'H', long, default_value = "localhost", env = "SCHEMA_WARDEN_DB_HOST",
-        help = "Hostname or IP addresses of a target Server. If a non-default port is needed, separate use `;`")]
+        help = "SQL Server host. Repeat for multiple hosts. Use host:port for non-default ports (e.g. myserver:1435)")]
     db_host: Vec<ServerHost>,
 
     #[clap(long, short = 'u', env = "SCHEMA_WARDEN_DB_USER",
         help = "SQL Server login username")]
     db_user: String,
 
-    #[clap(long, short = 'p', env = "SCHEMA_WARDEN_DB_PWD", hide_env_values = true,
+    #[clap(long = "db-password", short = 'p', env = "SCHEMA_WARDEN_DB_PWD", alias="db-pwd", hide_env_values = true,
         help = "SQL Server login password")]
     db_pwd: String,
 
@@ -57,12 +57,11 @@ pub struct Args {
         help = "Name of the database to be treated as the source of truth")]
     baseline_db: String,
 
-    #[clap(long, short='B', env = "SCHEMA_WARDEN_BASELINE_HOST", help="Baseline database host, defaults first db_host")]
+    #[clap(long, env = "SCHEMA_WARDEN_BASELINE_HOST", help="Baseline database host, defaults first db_host")]
     baseline_host: Option<ServerHost>,
 
-    #[clap(long, short, env = "SCHEMA_WARDEN_EXCLUDE_DATABASES",
-        help = "Database to exclude from the comparison",
-    )]
+    #[clap(long, short, value_delimiter = ',', env = "SCHEMA_WARDEN_EXCLUDE_DATABASES",
+        help = "Databases to exclude. Comma-separated or repeated flags: -e db1,db2 or -e db1 -e db2")]
     exclude_databases: Vec<String>,
 
     #[clap(long, short, env = "SCHEMA_WARDEN_TRUST_CERT",
@@ -70,7 +69,7 @@ pub struct Args {
     trust_cert: bool,
 
     #[clap(long, short, env = "SCHEMA_WARDEN_OBJECT",
-        help = "Limit diff to a single object")]
+        help = "Limit diff to a specific object. Format: [schema.]name — defaults to dbo if schema is omitted (e.g. --object MyTable or --object dbo.MyTable)")]
     object: Option<String>,
 
     #[clap(long, short = 'c', default_value_t = 4, env = "SCHEMA_WARDEN_CONCURRENCY",
