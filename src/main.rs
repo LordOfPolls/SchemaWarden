@@ -347,6 +347,7 @@ pub async fn connect(
 
     config.host(host.hostname.clone());
     config.port(host.port.unwrap_or(1433));
+    config.readonly(true);
     config.authentication(AuthMethod::sql_server(
         args.db_user.clone(),
         args.db_pwd.clone(),
