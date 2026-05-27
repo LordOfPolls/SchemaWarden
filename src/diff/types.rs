@@ -230,5 +230,8 @@ pub enum ModuleChangeKind {
         #[serde(skip)]
         definition: String,
     },
-    DefinitionChanged { baseline: String, target: String },
+    DefinitionChanged {
+        baseline: String,
+        target: String,
+    },
 }

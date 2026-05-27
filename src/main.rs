@@ -2,24 +2,23 @@ mod diff;
 mod fetcher;
 mod schema;
 
+use anyhow::Context;
+use clap::Parser;
+use futures::stream::{self, StreamExt, TryStreamExt};
+use serde::Serialize;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
-use anyhow::Context;
-use futures::stream::{self, StreamExt, TryStreamExt};
-use serde::Serialize;
 use tiberius::{AuthMethod, Client, Config, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
-use clap::Parser;
-
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
 enum OutputFormat {
     Text,
     #[default]
-    Json
+    Json,
 }
 
 #[derive(Clone, Debug)]
@@ -50,52 +49,109 @@ impl FromStr for ServerHost {
 }
 
 #[derive(Parser, Debug)]
-#[command(version, about = "Schema drift detection for multi-tenant MSSQL databases")]
+#[command(
+    version,
+    about = "Schema drift detection for multi-tenant MSSQL databases"
+)]
 pub struct Args {
-    #[clap(short = 'H', long,  value_delimiter = ',', default_value = "localhost", env = "SCHEMA_WARDEN_DB_HOST",
-        help = "SQL Server host. Repeat for multiple hosts. Use host:port for non-default ports (e.g. myserver:1435)")]
+    #[clap(
+        short = 'H',
+        long,
+        value_delimiter = ',',
+        default_value = "localhost",
+        env = "SCHEMA_WARDEN_DB_HOST",
+        help = "SQL Server host. Repeat for multiple hosts. Use host:port for non-default ports (e.g. myserver:1435)"
+    )]
     db_host: Vec<ServerHost>,
 
-    #[clap(long, short = 'u', env = "SCHEMA_WARDEN_DB_USER",
-        help = "SQL Server login username")]
+    #[clap(
+        long,
+        short = 'u',
+        env = "SCHEMA_WARDEN_DB_USER",
+        help = "SQL Server login username"
+    )]
     db_user: String,
 
-    #[clap(long = "db-password", short = 'p', env = "SCHEMA_WARDEN_DB_PWD", alias="db-pwd", hide_env_values = true,
-        help = "SQL Server login password")]
+    #[clap(
+        long = "db-password",
+        short = 'p',
+        env = "SCHEMA_WARDEN_DB_PWD",
+        alias = "db-pwd",
+        hide_env_values = true,
+        help = "SQL Server login password"
+    )]
     db_pwd: String,
 
-    #[clap(long, short, env = "SCHEMA_WARDEN_BASELINE_DB",
-        help = "Name of the database to be treated as the source of truth")]
+    #[clap(
+        long,
+        short,
+        env = "SCHEMA_WARDEN_BASELINE_DB",
+        help = "Name of the database to be treated as the source of truth"
+    )]
     baseline_db: String,
 
-    #[clap(long, env = "SCHEMA_WARDEN_BASELINE_HOST", help="Baseline database host, defaults first db_host")]
+    #[clap(
+        long,
+        env = "SCHEMA_WARDEN_BASELINE_HOST",
+        help = "Baseline database host, defaults first db_host"
+    )]
     baseline_host: Option<ServerHost>,
 
-    #[clap(long, short, value_delimiter = ',', env = "SCHEMA_WARDEN_EXCLUDE_DATABASES",
-        help = "Databases to exclude. Comma-separated or repeated flags: -e db1,db2 or -e db1 -e db2")]
+    #[clap(
+        long,
+        short,
+        value_delimiter = ',',
+        env = "SCHEMA_WARDEN_EXCLUDE_DATABASES",
+        help = "Databases to exclude. Comma-separated or repeated flags: -e db1,db2 or -e db1 -e db2"
+    )]
     exclude_databases: Vec<String>,
 
-    #[clap(long, short, env = "SCHEMA_WARDEN_TRUST_CERT",
-        help = "Trust the server's cert without verification")]
+    #[clap(
+        long,
+        short,
+        env = "SCHEMA_WARDEN_TRUST_CERT",
+        help = "Trust the server's cert without verification"
+    )]
     trust_cert: bool,
 
-    #[clap(long, env = "SCHEMA_WARDEN_OBJECT",
-        help = "Limit diff to a specific object. Format: [schema.]name — defaults to dbo if schema is omitted (e.g. --object MyTable or --object dbo.MyTable)")]
+    #[clap(
+        long,
+        env = "SCHEMA_WARDEN_OBJECT",
+        help = "Limit diff to a specific object. Format: [schema.]name — defaults to dbo if schema is omitted (e.g. --object MyTable or --object dbo.MyTable)"
+    )]
     object: Option<String>,
 
-    #[clap(long, short = 'c', default_value_t = 4, env = "SCHEMA_WARDEN_CONCURRENCY",
-        help = "Maximum number of tenant databases to scan in parallel")]
+    #[clap(
+        long,
+        short = 'c',
+        default_value_t = 4,
+        env = "SCHEMA_WARDEN_CONCURRENCY",
+        help = "Maximum number of tenant databases to scan in parallel"
+    )]
     concurrency: usize,
 
-    #[clap(long, value_enum, default_value_t, help="Output format (text or json)")]
+    #[clap(
+        long,
+        value_enum,
+        default_value_t,
+        help = "Output format (text or json)"
+    )]
     format: OutputFormat,
 
-    #[clap(long, short = 'o', env = "SCHEMA_WARDEN_OUTPUT",
-        help = "Write output to this file instead of stdout")]
+    #[clap(
+        long,
+        short = 'o',
+        env = "SCHEMA_WARDEN_OUTPUT",
+        help = "Write output to this file instead of stdout"
+    )]
     output: Option<PathBuf>,
 
-    #[clap(long, env = "SCHEMA_WARDEN_DIFF_DIR", requires = "object",
-        help = "Write a unified-diff file per drifted tenant. Requires --object pointing at a module-type object (view/procedure/function/trigger)")]
+    #[clap(
+        long,
+        env = "SCHEMA_WARDEN_DIFF_DIR",
+        requires = "object",
+        help = "Write a unified-diff file per drifted tenant. Requires --object pointing at a module-type object (view/procedure/function/trigger)"
+    )]
     diff_dir: Option<PathBuf>,
 }
 
@@ -122,10 +178,14 @@ async fn main() -> anyhow::Result<()> {
     let filter = args.object.as_deref().map(parse_object_filter);
     let filter_ref = filter.as_ref().map(|(s, n)| (s.as_str(), n.as_str()));
 
-    let baseline_host = args.baseline_host.clone().unwrap_or_else(|| args.db_host[0].clone());
+    let baseline_host = args
+        .baseline_host
+        .clone()
+        .unwrap_or_else(|| args.db_host[0].clone());
 
     let mut baseline_client = connect(&baseline_host, &args.baseline_db, &args).await?;
-    let baseline = fetcher::fetch_schema(&mut baseline_client, &args.baseline_db, filter_ref).await?;
+    let baseline =
+        fetcher::fetch_schema(&mut baseline_client, &args.baseline_db, filter_ref).await?;
 
     let tenants_by_host = stream::iter(args.db_host.iter().cloned())
         .then(|host| {
@@ -190,12 +250,21 @@ async fn main() -> anyhow::Result<()> {
 
         let sanitize = |s: &str| -> String {
             s.chars()
-                .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' { c } else { '_' })
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
                 .collect()
         };
 
         for report in &reports {
-            let module_change = report.drift.views.iter()
+            let module_change = report
+                .drift
+                .views
+                .iter()
                 .chain(report.drift.procedures.iter())
                 .chain(report.drift.functions.iter())
                 .chain(report.drift.triggers.iter())
@@ -204,12 +273,11 @@ async fn main() -> anyhow::Result<()> {
             let Some(mc) = module_change else { continue };
 
             let (bl_text, tgt_text) = match &mc.kind {
-                diff::ModuleChangeKind::DefinitionChanged { baseline, target } =>
-                    (Some(baseline.as_str()), Some(target.as_str())),
-                diff::ModuleChangeKind::Added { definition } =>
-                    (None, Some(definition.as_str())),
-                diff::ModuleChangeKind::Removed { definition } =>
-                    (Some(definition.as_str()), None),
+                diff::ModuleChangeKind::DefinitionChanged { baseline, target } => {
+                    (Some(baseline.as_str()), Some(target.as_str()))
+                }
+                diff::ModuleChangeKind::Added { definition } => (None, Some(definition.as_str())),
+                diff::ModuleChangeKind::Removed { definition } => (Some(definition.as_str()), None),
             };
 
             let header_baseline = format!(
@@ -221,7 +289,9 @@ async fn main() -> anyhow::Result<()> {
                 report.host, report.database, object_key
             );
 
-            let Some(patch) = diff::render_module_patch(bl_text, tgt_text, &header_baseline, &header_target) else {
+            let Some(patch) =
+                diff::render_module_patch(bl_text, tgt_text, &header_baseline, &header_target)
+            else {
                 continue;
             };
 
@@ -238,9 +308,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let mut out: Box<dyn Write> = match &args.output {
-        Some(path) => Box::new(BufWriter::new(
-            File::create(path).with_context(|| format!("Failed to create output file: {}", path.display()))?,
-        )),
+        Some(path) => Box::new(BufWriter::new(File::create(path).with_context(|| {
+            format!("Failed to create output file: {}", path.display())
+        })?)),
         None => Box::new(io::stdout().lock()),
     };
 
@@ -260,16 +330,27 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let exit_code = if reports.iter().any(|r| !r.is_clean) { 1 } else { 0 };
+    let exit_code = if reports.iter().any(|r| !r.is_clean) {
+        1
+    } else {
+        0
+    };
     std::process::exit(exit_code);
 }
 
-pub async fn connect(host: &ServerHost, db_name: &str, args: &Args) -> anyhow::Result<Client<Compat<TcpStream>>> {
+pub async fn connect(
+    host: &ServerHost,
+    db_name: &str,
+    args: &Args,
+) -> anyhow::Result<Client<Compat<TcpStream>>> {
     let mut config = Config::new();
 
     config.host(host.hostname.clone());
     config.port(host.port.unwrap_or(1433));
-    config.authentication(AuthMethod::sql_server(args.db_user.clone(), args.db_pwd.clone()));
+    config.authentication(AuthMethod::sql_server(
+        args.db_user.clone(),
+        args.db_pwd.clone(),
+    ));
 
     if args.trust_cert {
         config.trust_cert();
@@ -283,7 +364,6 @@ pub async fn connect(host: &ServerHost, db_name: &str, args: &Args) -> anyhow::R
         .await
         .context("Failed to connect to database")
 }
-
 
 pub async fn fetch_tenants(host: &ServerHost, args: &Args) -> anyhow::Result<Vec<String>> {
     let mut client = connect(host, "master", args).await?;
@@ -302,8 +382,8 @@ pub async fn fetch_tenants(host: &ServerHost, args: &Args) -> anyhow::Result<Vec
 
     let rows = Query::new(sql)
         .query(&mut client)
-        .await
-        ?.into_first_result()
+        .await?
+        .into_first_result()
         .await;
 
     let mut tenants = Vec::new();
