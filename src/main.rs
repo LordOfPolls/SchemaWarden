@@ -52,7 +52,7 @@ impl FromStr for ServerHost {
 #[derive(Parser, Debug)]
 #[command(version, about = "Schema drift detection for multi-tenant MSSQL databases")]
 pub struct Args {
-    #[clap(short = 'H', long, default_value = "localhost", env = "SCHEMA_WARDEN_DB_HOST",
+    #[clap(short = 'H', long,  value_delimiter = ',', default_value = "localhost", env = "SCHEMA_WARDEN_DB_HOST",
         help = "SQL Server host. Repeat for multiple hosts. Use host:port for non-default ports (e.g. myserver:1435)")]
     db_host: Vec<ServerHost>,
 
@@ -116,6 +116,7 @@ fn parse_object_filter(s: &str) -> (String, String) {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
     let args = Args::parse();
 
     let filter = args.object.as_deref().map(parse_object_filter);
