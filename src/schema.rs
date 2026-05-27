@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use serde::Serialize;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -73,7 +74,7 @@ pub struct IndexDef {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IndexColumnRef {
     pub name: String,
     pub is_descending: bool,

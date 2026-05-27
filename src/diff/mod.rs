@@ -29,7 +29,7 @@ fn diff_tables(
         if !target.contains_key(key) {
             changes.push(TableChange {
                 key: key.clone(),
-                kind: TableChangeKind::Removed,
+                kind: TableChangeKind::Removed {},
             });
         }
     }
@@ -37,7 +37,7 @@ fn diff_tables(
         if !baseline.contains_key(key) {
             changes.push(TableChange {
                 key: key.clone(),
-                kind: TableChangeKind::Added,
+                kind: TableChangeKind::Added {},
             });
         }
     }
@@ -78,7 +78,7 @@ fn diff_columns(baseline: &[ColumnDef], target: &[ColumnDef]) -> Vec<ColumnChang
         if !t.contains_key(name) {
             changes.push(ColumnChange {
                 name: name.to_string(),
-                kind: ColumnChangeKind::Removed,
+                kind: ColumnChangeKind::Removed {},
             });
         }
     }
@@ -86,7 +86,7 @@ fn diff_columns(baseline: &[ColumnDef], target: &[ColumnDef]) -> Vec<ColumnChang
         if !b.contains_key(name) {
             changes.push(ColumnChange {
                 name: name.to_string(),
-                kind: ColumnChangeKind::Added,
+                kind: ColumnChangeKind::Added {},
             });
         }
     }
@@ -96,7 +96,7 @@ fn diff_columns(baseline: &[ColumnDef], target: &[ColumnDef]) -> Vec<ColumnChang
             if !fields.is_empty() {
                 changes.push(ColumnChange {
                     name: name.to_string(),
-                    kind: ColumnChangeKind::Modified(fields),
+                    kind: ColumnChangeKind::Modified { fields },
                 });
             }
         }
@@ -161,7 +161,7 @@ fn diff_indexes(baseline: &[IndexDef], target: &[IndexDef]) -> Vec<IndexChange> 
         if !t.contains_key(name) {
             changes.push(IndexChange {
                 name: name.to_string(),
-                kind: IndexChangeKind::Removed,
+                kind: IndexChangeKind::Removed {},
             });
         }
     }
@@ -169,7 +169,7 @@ fn diff_indexes(baseline: &[IndexDef], target: &[IndexDef]) -> Vec<IndexChange> 
         if !b.contains_key(name) {
             changes.push(IndexChange {
                 name: name.to_string(),
-                kind: IndexChangeKind::Added,
+                kind: IndexChangeKind::Added {},
             });
         }
     }
@@ -179,7 +179,7 @@ fn diff_indexes(baseline: &[IndexDef], target: &[IndexDef]) -> Vec<IndexChange> 
             if !fields.is_empty() {
                 changes.push(IndexChange {
                     name: name.to_string(),
-                    kind: IndexChangeKind::Modified(fields),
+                    kind: IndexChangeKind::Modified { fields },
                 });
             }
         }
@@ -228,7 +228,7 @@ fn diff_foreign_keys(baseline: &[ForeignKeyDef], target: &[ForeignKeyDef]) -> Ve
         if !t.contains_key(name) {
             changes.push(FkChange {
                 name: name.to_string(),
-                kind: FkChangeKind::Removed,
+                kind: FkChangeKind::Removed {},
             });
         }
     }
@@ -236,7 +236,7 @@ fn diff_foreign_keys(baseline: &[ForeignKeyDef], target: &[ForeignKeyDef]) -> Ve
         if !b.contains_key(name) {
             changes.push(FkChange {
                 name: name.to_string(),
-                kind: FkChangeKind::Added,
+                kind: FkChangeKind::Added {},
             });
         }
     }
@@ -246,7 +246,7 @@ fn diff_foreign_keys(baseline: &[ForeignKeyDef], target: &[ForeignKeyDef]) -> Ve
             if !fields.is_empty() {
                 changes.push(FkChange {
                     name: name.to_string(),
-                    kind: FkChangeKind::Modified(fields),
+                    kind: FkChangeKind::Modified { fields },
                 });
             }
         }
@@ -306,7 +306,7 @@ fn diff_check_constraints(
         if !t.contains_key(name) {
             changes.push(ConstraintChange {
                 name: name.to_string(),
-                kind: ConstraintChangeKind::Removed,
+                kind: ConstraintChangeKind::Removed {},
             });
         }
     }
@@ -314,7 +314,7 @@ fn diff_check_constraints(
         if !b.contains_key(name) {
             changes.push(ConstraintChange {
                 name: name.to_string(),
-                kind: ConstraintChangeKind::Added,
+                kind: ConstraintChangeKind::Added {},
             });
         }
     }
@@ -345,7 +345,7 @@ fn diff_modules(
         if !target.contains_key(key) {
             changes.push(ModuleChange {
                 key: key.clone(),
-                kind: ModuleChangeKind::Removed,
+                kind: ModuleChangeKind::Removed {},
             });
         }
     }
@@ -353,7 +353,7 @@ fn diff_modules(
         if !baseline.contains_key(key) {
             changes.push(ModuleChange {
                 key: key.clone(),
-                kind: ModuleChangeKind::Added,
+                kind: ModuleChangeKind::Added {},
             });
         }
     }

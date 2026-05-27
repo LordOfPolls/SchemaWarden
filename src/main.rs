@@ -2,17 +2,28 @@ mod diff;
 mod fetcher;
 mod schema;
 
+use std::fs::File;
+use std::io::{self, BufWriter, Write};
+use std::path::PathBuf;
 use std::str::FromStr;
 use anyhow::Context;
 use futures::stream::{self, StreamExt, TryStreamExt};
+use serde::Serialize;
 use tiberius::{AuthMethod, Client, Config, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use clap::Parser;
 
 
+#[derive(clap::ValueEnum, Clone, Debug, Default)]
+enum OutputFormat {
+    Text,
+    #[default]
+    Json
+}
+
 #[derive(Clone, Debug)]
-struct ServerHost {
+pub struct ServerHost {
     hostname: String,
     port: Option<u16>,
 }
@@ -68,13 +79,28 @@ pub struct Args {
         help = "Trust the server's cert without verification")]
     trust_cert: bool,
 
-    #[clap(long, short, env = "SCHEMA_WARDEN_OBJECT",
+    #[clap(long, env = "SCHEMA_WARDEN_OBJECT",
         help = "Limit diff to a specific object. Format: [schema.]name — defaults to dbo if schema is omitted (e.g. --object MyTable or --object dbo.MyTable)")]
     object: Option<String>,
 
     #[clap(long, short = 'c', default_value_t = 4, env = "SCHEMA_WARDEN_CONCURRENCY",
         help = "Maximum number of tenant databases to scan in parallel")]
     concurrency: usize,
+
+    #[clap(long, value_enum, default_value_t, help="Output format (text or json)")]
+    format: OutputFormat,
+
+    #[clap(long, short = 'o', env = "SCHEMA_WARDEN_OUTPUT",
+        help = "Write output to this file instead of stdout")]
+    output: Option<PathBuf>,
+}
+
+#[derive(Serialize)]
+struct TenantReport {
+    host: String,
+    database: String,
+    is_clean: bool,
+    drift: diff::SchemaDiff,
 }
 
 fn parse_object_filter(s: &str) -> (String, String) {
@@ -120,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
 
     let concurrency = args.concurrency.max(1);
 
-    let drifts: Vec<bool> = stream::iter(tenants_by_host)
+    let mut reports: Vec<TenantReport> = stream::iter(tenants_by_host)
         .map(|(host, db)| {
             let baseline = &baseline;
             let args = &args;
@@ -128,21 +154,45 @@ async fn main() -> anyhow::Result<()> {
                 let mut client = connect(&host, &db, args).await?;
                 let tenant = fetcher::fetch_schema(&mut client, &db, filter_ref).await?;
                 let drift = diff::diff(baseline, &tenant);
-
-                if drift.is_clean() {
-                    println!("{}:{db}: no drift detected", host.hostname);
-                    Ok::<bool, anyhow::Error>(false)
-                } else {
-                    println!("{}:{db}\n{drift}", host.hostname);
-                    Ok::<bool, anyhow::Error>(true)
-                }
+                let is_clean = drift.is_clean();
+                Ok::<TenantReport, anyhow::Error>(TenantReport {
+                    host: host.hostname.clone(),
+                    database: db.clone(),
+                    is_clean,
+                    drift,
+                })
             }
         })
         .buffer_unordered(concurrency)
         .try_collect()
         .await?;
 
-    let exit_code = if drifts.iter().any(|&d| d) { 1 } else { 0 };
+    reports.sort_by(|a, b| a.host.cmp(&b.host).then(a.database.cmp(&b.database)));
+
+    let mut out: Box<dyn Write> = match &args.output {
+        Some(path) => Box::new(BufWriter::new(
+            File::create(path).with_context(|| format!("Failed to create output file: {}", path.display()))?,
+        )),
+        None => Box::new(io::stdout().lock()),
+    };
+
+    match args.format {
+        OutputFormat::Text => {
+            for r in &reports {
+                if r.is_clean {
+                    writeln!(out, "{}:{}: no drift detected", r.host, r.database)?;
+                } else {
+                    writeln!(out, "{}:{}\n{}", r.host, r.database, r.drift)?;
+                }
+            }
+        }
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut out, &reports)?;
+            writeln!(out)?;
+        }
+    }
+
+    let exit_code = if reports.iter().any(|r| !r.is_clean) { 1 } else { 0 };
     std::process::exit(exit_code);
 }
 

@@ -25,8 +25,8 @@ fn fmt_table_section(f: &mut fmt::Formatter<'_>, changes: &[TableChange]) -> fmt
     }
     for tc in changes {
         match &tc.kind {
-            TableChangeKind::Added => writeln!(f, "  + {}", tc.key)?,
-            TableChangeKind::Removed => writeln!(f, "  - {}", tc.key)?,
+            TableChangeKind::Added {} => writeln!(f, "  + {}", tc.key)?,
+            TableChangeKind::Removed {} => writeln!(f, "  - {}", tc.key)?,
             TableChangeKind::Modified(body) => {
                 writeln!(f, "  ~ {}", tc.key)?;
                 fmt_body_diff(f, body)?;
@@ -41,9 +41,9 @@ fn fmt_body_diff(f: &mut fmt::Formatter<'_>, body: &TableBodyDiff) -> fmt::Resul
         writeln!(f, "      columns:")?;
         for c in &body.columns {
             match &c.kind {
-                ColumnChangeKind::Added => writeln!(f, "        + {}", c.name)?,
-                ColumnChangeKind::Removed => writeln!(f, "        - {}", c.name)?,
-                ColumnChangeKind::Modified(fields) => {
+                ColumnChangeKind::Added {} => writeln!(f, "        + {}", c.name)?,
+                ColumnChangeKind::Removed {} => writeln!(f, "        - {}", c.name)?,
+                ColumnChangeKind::Modified { fields } => {
                     writeln!(f, "        ~ {}", c.name)?;
                     for field in fields {
                         writeln!(f, "            {field}")?;
@@ -56,9 +56,9 @@ fn fmt_body_diff(f: &mut fmt::Formatter<'_>, body: &TableBodyDiff) -> fmt::Resul
         writeln!(f, "      indexes:")?;
         for i in &body.indexes {
             match &i.kind {
-                IndexChangeKind::Added => writeln!(f, "        + {}", i.name)?,
-                IndexChangeKind::Removed => writeln!(f, "        - {}", i.name)?,
-                IndexChangeKind::Modified(fields) => {
+                IndexChangeKind::Added {} => writeln!(f, "        + {}", i.name)?,
+                IndexChangeKind::Removed {} => writeln!(f, "        - {}", i.name)?,
+                IndexChangeKind::Modified { fields } => {
                     writeln!(f, "        ~ {}", i.name)?;
                     for field in fields {
                         match field {
@@ -98,9 +98,9 @@ fn fmt_body_diff(f: &mut fmt::Formatter<'_>, body: &TableBodyDiff) -> fmt::Resul
         writeln!(f, "      foreign_keys:")?;
         for fk in &body.foreign_keys {
             match &fk.kind {
-                FkChangeKind::Added => writeln!(f, "        + {}", fk.name)?,
-                FkChangeKind::Removed => writeln!(f, "        - {}", fk.name)?,
-                FkChangeKind::Modified(fields) => {
+                FkChangeKind::Added {} => writeln!(f, "        + {}", fk.name)?,
+                FkChangeKind::Removed {} => writeln!(f, "        - {}", fk.name)?,
+                FkChangeKind::Modified { fields } => {
                     writeln!(f, "        ~ {}", fk.name)?;
                     for field in fields {
                         match field {
@@ -131,8 +131,8 @@ fn fmt_body_diff(f: &mut fmt::Formatter<'_>, body: &TableBodyDiff) -> fmt::Resul
         writeln!(f, "      check_constraints:")?;
         for cc in &body.check_constraints {
             match &cc.kind {
-                ConstraintChangeKind::Added => writeln!(f, "        + {}", cc.name)?,
-                ConstraintChangeKind::Removed => writeln!(f, "        - {}", cc.name)?,
+                ConstraintChangeKind::Added {} => writeln!(f, "        + {}", cc.name)?,
+                ConstraintChangeKind::Removed {} => writeln!(f, "        - {}", cc.name)?,
                 ConstraintChangeKind::DefinitionChanged { .. } => {
                     writeln!(f, "        ~ {}: definition changed", cc.name)?
                 }
@@ -153,8 +153,8 @@ fn fmt_module_section(
     }
     for mc in changes {
         match &mc.kind {
-            ModuleChangeKind::Added => writeln!(f, "  + {}", mc.key)?,
-            ModuleChangeKind::Removed => writeln!(f, "  - {}", mc.key)?,
+            ModuleChangeKind::Added {} => writeln!(f, "  + {}", mc.key)?,
+            ModuleChangeKind::Removed {} => writeln!(f, "  - {}", mc.key)?,
             ModuleChangeKind::DefinitionChanged { .. } => {
                 writeln!(f, "  ~ {}: definition changed", mc.key)?
             }
