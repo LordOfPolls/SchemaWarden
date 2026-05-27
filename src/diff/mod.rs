@@ -1,6 +1,8 @@
 mod display;
+mod patch;
 mod types;
 
+pub use patch::render_module_patch;
 pub use types::*;
 
 use indexmap::IndexMap;
@@ -345,7 +347,9 @@ fn diff_modules(
         if !target.contains_key(key) {
             changes.push(ModuleChange {
                 key: key.clone(),
-                kind: ModuleChangeKind::Removed {},
+                kind: ModuleChangeKind::Removed {
+                    definition: baseline[key].definition.clone(),
+                },
             });
         }
     }
@@ -353,7 +357,9 @@ fn diff_modules(
         if !baseline.contains_key(key) {
             changes.push(ModuleChange {
                 key: key.clone(),
-                kind: ModuleChangeKind::Added {},
+                kind: ModuleChangeKind::Added {
+                    definition: target[key].definition.clone(),
+                },
             });
         }
     }

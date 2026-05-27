@@ -222,7 +222,13 @@ pub struct ModuleChange {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ModuleChangeKind {
-    Added {},
-    Removed {},
+    Added {
+        #[serde(skip)]
+        definition: String,
+    },
+    Removed {
+        #[serde(skip)]
+        definition: String,
+    },
     DefinitionChanged { baseline: String, target: String },
 }

@@ -93,6 +93,10 @@ pub struct Args {
     #[clap(long, short = 'o', env = "SCHEMA_WARDEN_OUTPUT",
         help = "Write output to this file instead of stdout")]
     output: Option<PathBuf>,
+
+    #[clap(long, env = "SCHEMA_WARDEN_DIFF_DIR", requires = "object",
+        help = "Write a unified-diff file per drifted tenant. Requires --object pointing at a module-type object (view/procedure/function/trigger)")]
+    diff_dir: Option<PathBuf>,
 }
 
 #[derive(Serialize)]
@@ -168,6 +172,69 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     reports.sort_by(|a, b| a.host.cmp(&b.host).then(a.database.cmp(&b.database)));
+
+    if let Some(diff_dir) = &args.diff_dir {
+        let (filter_schema, filter_name) = filter.as_ref().unwrap();
+        let object_key = format!("{}.{}", filter_schema, filter_name);
+
+        if baseline.tables.contains_key(&object_key) {
+            anyhow::bail!(
+                "--diff-dir only supports module-type objects (view/procedure/function/trigger); '{}' is a table",
+                object_key
+            );
+        }
+
+        std::fs::create_dir_all(diff_dir)
+            .with_context(|| format!("Failed to create diff directory: {}", diff_dir.display()))?;
+
+        let sanitize = |s: &str| -> String {
+            s.chars()
+                .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' { c } else { '_' })
+                .collect()
+        };
+
+        for report in &reports {
+            let module_change = report.drift.views.iter()
+                .chain(report.drift.procedures.iter())
+                .chain(report.drift.functions.iter())
+                .chain(report.drift.triggers.iter())
+                .next();
+
+            let Some(mc) = module_change else { continue };
+
+            let (bl_text, tgt_text) = match &mc.kind {
+                diff::ModuleChangeKind::DefinitionChanged { baseline, target } =>
+                    (Some(baseline.as_str()), Some(target.as_str())),
+                diff::ModuleChangeKind::Added { definition } =>
+                    (None, Some(definition.as_str())),
+                diff::ModuleChangeKind::Removed { definition } =>
+                    (Some(definition.as_str()), None),
+            };
+
+            let header_baseline = format!(
+                "baseline: {}/{} ({})",
+                baseline_host.hostname, args.baseline_db, object_key
+            );
+            let header_target = format!(
+                "target:   {}/{} ({})",
+                report.host, report.database, object_key
+            );
+
+            let Some(patch) = diff::render_module_patch(bl_text, tgt_text, &header_baseline, &header_target) else {
+                continue;
+            };
+
+            let filename = format!(
+                "{}__{}__{}.diff",
+                sanitize(&report.host),
+                sanitize(&report.database),
+                sanitize(&object_key),
+            );
+            let path = diff_dir.join(&filename);
+            std::fs::write(&path, &patch)
+                .with_context(|| format!("Failed to write diff file: {}", path.display()))?;
+        }
+    }
 
     let mut out: Box<dyn Write> = match &args.output {
         Some(path) => Box::new(BufWriter::new(

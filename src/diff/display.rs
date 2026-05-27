@@ -153,8 +153,8 @@ fn fmt_module_section(
     }
     for mc in changes {
         match &mc.kind {
-            ModuleChangeKind::Added {} => writeln!(f, "  + {}", mc.key)?,
-            ModuleChangeKind::Removed {} => writeln!(f, "  - {}", mc.key)?,
+            ModuleChangeKind::Added { .. } => writeln!(f, "  + {}", mc.key)?,
+            ModuleChangeKind::Removed { .. } => writeln!(f, "  - {}", mc.key)?,
             ModuleChangeKind::DefinitionChanged { .. } => {
                 writeln!(f, "  ~ {}: definition changed", mc.key)?
             }
