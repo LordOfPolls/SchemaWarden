@@ -4,7 +4,7 @@ use std::time::Instant;
 use tiberius::{Client, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::Compat;
-use tracing::{debug, instrument, warn};
+use tracing::{debug, instrument};
 
 use crate::schema::*;
 use crate::sql_normalise::normalise_sql_text;
