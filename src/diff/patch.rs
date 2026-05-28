@@ -16,6 +16,7 @@ pub fn render_module_patch(
     }
     let patch = TextDiff::from_lines(b, t)
         .unified_diff()
+        .context_radius(usize::MAX)
         .header(header_baseline, header_target)
         .to_string();
     Some(patch)
