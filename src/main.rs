@@ -2,6 +2,7 @@ mod diff;
 mod fetcher;
 mod schema;
 mod std_display;
+mod sql_normalise;
 
 use anyhow::Context;
 use clap::Parser;
