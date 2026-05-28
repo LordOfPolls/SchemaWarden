@@ -86,3 +86,55 @@ pub fn normalise_sql_text(input: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::normalise_sql_text;
+
+    macro_rules! fixture {
+        ($name:ident) => {
+            #[test]
+            fn $name() {
+                let input = include_str!(concat!(
+                    "../tests/sql_normalise/",
+                    stringify!($name),
+                    ".sql"
+                ));
+                let expected = include_str!(concat!(
+                    "../tests/sql_normalise/",
+                    stringify!($name),
+                    ".expected.sql"
+                ));
+                assert_eq!(normalise_sql_text(input), expected.trim_end());
+            }
+        };
+    }
+
+    fixture!(line_comments);
+    fixture!(block_comments);
+    fixture!(quoted);
+    fixture!(whitespace);
+    fixture!(stored_procedure);
+
+    #[test]
+    fn line_comment_at_eof_no_newline() {
+        assert_eq!(normalise_sql_text("SELECT 1 -- eof"), "SELECT 1");
+    }
+
+    #[test]
+    fn block_comment_unterminated() {
+        assert_eq!(normalise_sql_text("SELECT /* unterminated"), "SELECT");
+    }
+
+    #[test]
+    fn crlf_line_endings() {
+        assert_eq!(normalise_sql_text("SELECT 1\r\nFROM t"), "SELECT 1\nFROM t");
+    }
+
+    #[test]
+    fn idempotent() {
+        let sql = "SELECT  'it''s' -- comment\nFROM /* block */ t\nWHERE [col] = 1";
+        let once = normalise_sql_text(sql);
+        assert_eq!(once, normalise_sql_text(&once));
+    }
+}
