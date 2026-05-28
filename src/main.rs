@@ -573,8 +573,6 @@ pub async fn fetch_tenants(host: &ServerHost, args: &Args) -> anyhow::Result<Vec
     Ok(tenants)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,9 +580,9 @@ mod tests {
     #[test]
     fn test_get_version_label() {
         let expected = [
-            "A","B","C","D","E","F","G","H","I","J","K","L","M",
-            "N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
-            "A1","B1","C1","D1","E1","F1","G1","H1",
+            "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q",
+            "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "A1", "B1", "C1", "D1", "E1", "F1", "G1",
+            "H1",
         ];
         for (idx, label) in expected.iter().enumerate() {
             assert_eq!(get_version_label(idx), *label);
@@ -603,7 +601,10 @@ mod tests {
 
     #[test]
     fn test_parse_object_filter_multi_dot() {
-        assert_eq!(parse_object_filter("a.b.c"), ("a".to_owned(), "b.c".to_owned()));
+        assert_eq!(
+            parse_object_filter("a.b.c"),
+            ("a".to_owned(), "b.c".to_owned())
+        );
     }
 
     #[test]
