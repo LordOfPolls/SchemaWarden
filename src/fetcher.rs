@@ -2,9 +2,11 @@ use anyhow::Context;
 use indexmap::IndexMap;
 use sqlparser::dialect::MsSqlDialect;
 use sqlparser::parser::Parser;
+use std::time::Instant;
 use tiberius::{Client, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::Compat;
+use tracing::{debug, instrument, warn};
 
 use crate::schema::*;
 
@@ -16,6 +18,7 @@ static BLOCK_COMMENT_REG: std::sync::LazyLock<regex::Regex> =
 static WHITESPACE_REG: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"\s+").unwrap());
 
+#[instrument(skip(client), fields(db = %db_name))]
 pub async fn fetch_schema(
     client: &mut Client<Compat<TcpStream>>,
     db_name: &str,
@@ -23,21 +26,46 @@ pub async fn fetch_schema(
 ) -> anyhow::Result<DatabaseSchema> {
     let mut schema = DatabaseSchema::new(db_name);
 
+    let step = Instant::now();
     fetch_columns(client, &mut schema.tables, filter)
         .await
         .context("fetching columns")?;
+    debug!(
+        tables = schema.tables.len(),
+        elapsed_ms = step.elapsed().as_millis() as u64,
+        "fetched columns"
+    );
+
+    let step = Instant::now();
     fetch_indexes(client, &mut schema.tables, filter)
         .await
         .context("fetching indexes")?;
+    debug!(elapsed_ms = step.elapsed().as_millis() as u64, "fetched indexes");
+
+    let step = Instant::now();
     fetch_foreign_keys(client, &mut schema.tables, filter)
         .await
         .context("fetching foreign keys")?;
+    debug!(elapsed_ms = step.elapsed().as_millis() as u64, "fetched foreign keys");
+
+    let step = Instant::now();
     fetch_check_constraints(client, &mut schema.tables, filter)
         .await
         .context("fetching check constraints")?;
+    debug!(elapsed_ms = step.elapsed().as_millis() as u64, "fetched check constraints");
+
+    let step = Instant::now();
     fetch_sql_modules(client, &mut schema, filter)
         .await
         .context("fetching SQL modules")?;
+    debug!(
+        views = schema.views.len(),
+        procedures = schema.procedures.len(),
+        functions = schema.functions.len(),
+        triggers = schema.triggers.len(),
+        elapsed_ms = step.elapsed().as_millis() as u64,
+        "fetched SQL modules"
+    );
 
     Ok(schema)
 }
@@ -405,6 +433,13 @@ async fn fetch_sql_modules(
                 .collect::<Vec<_>>()
                 .join(";\n");
         } else {
+            // Fallback normalization differs from the AST path and can surface as false drift
+            // if baseline and tenant land on different branches.
+            warn!(
+                object = %format!("{}.{}", schema_name, object_name),
+                type_desc,
+                "sqlparser failed; using regex normalization fallback (may cause false drift)"
+            );
             let without_blocks = BLOCK_COMMENT_REG.replace_all(&definition, " ");
             definition = without_blocks
                 .lines()
