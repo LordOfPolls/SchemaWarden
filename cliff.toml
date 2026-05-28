@@ -1,0 +1,52 @@
+[changelog]
+header = """
+# Changelog
+
+All notable changes to Schema Warden are documented here.
+
+---
+"""
+
+body = """
+{% if version %}\
+## {{ version }} — {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## Unreleased
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}\
+- {{ commit.message | upper_first }}\
+{% if commit.breaking %} [**breaking change**]{% endif %}
+
+{% endfor %}\
+{% endfor %}\
+---
+"""
+
+footer = ""
+trim = true
+postprocessors = []
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+
+commit_parsers = [
+  { message = "^feat",     group = "Features"       },
+  { message = "^fix",      group = "Bug Fixes"      },
+  { message = "^refactor", group = "Refactoring"    },
+  { message = "^perf",     group = "Performance"    },
+  { message = "^docs",     group = "Documentation"  },
+  { message = "^test",     group = "Testing"        },
+  { message = "^ci",       skip = true              },
+  { message = "^chore",    skip = true              },
+  { message = "^style",    skip = true              },
+  { message = "^build",    skip = true              },
+]
+
+filter_commits = false
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "oldest"
