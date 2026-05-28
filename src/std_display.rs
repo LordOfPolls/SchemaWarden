@@ -1,7 +1,7 @@
+use crate::{TENANT_LIST_MAX, TenantReport, diff, get_version_label};
+use comfy_table::{Cell, Table};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
-use comfy_table::{Cell, Table};
-use crate::{diff, get_version_label, TenantReport, TENANT_LIST_MAX};
 
 pub fn compute_ambiguous_dbs(reports: &[TenantReport]) -> BTreeSet<String> {
     let mut db_name_hosts: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -18,9 +18,7 @@ pub fn compute_ambiguous_dbs(reports: &[TenantReport]) -> BTreeSet<String> {
         .collect()
 }
 
-pub fn order_drift_groups<T>(
-    groups: BTreeMap<String, Vec<T>>,
-) -> Vec<(String, Vec<T>)> {
+pub fn order_drift_groups<T>(groups: BTreeMap<String, Vec<T>>) -> Vec<(String, Vec<T>)> {
     let mut ordered: Vec<(String, Vec<T>)> = groups.into_iter().collect();
     ordered.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then(a.0.cmp(&b.0)));
     ordered
@@ -50,8 +48,18 @@ pub fn truncate_tenant_list(tenant_ids: &[String], ambiguous_dbs: &BTreeSet<Stri
     out
 }
 
-fn make_row(label: String, tenants: &[String], ambiguous_dbs: &BTreeSet<String>, is_baseline: bool) -> (String, String, usize, bool) {
-    (label, truncate_tenant_list(tenants, ambiguous_dbs), tenants.len(), is_baseline)
+fn make_row(
+    label: String,
+    tenants: &[String],
+    ambiguous_dbs: &BTreeSet<String>,
+    is_baseline: bool,
+) -> (String, String, usize, bool) {
+    (
+        label,
+        truncate_tenant_list(tenants, ambiguous_dbs),
+        tenants.len(),
+        is_baseline,
+    )
 }
 
 fn version_label(idx: usize, is_baseline: bool) -> String {
@@ -96,15 +104,17 @@ fn build_module_sections(
                 None => continue,
                 Some(mc) => mc.kind.fingerprint(),
             };
-            fingerprint_map.entry(fingerprint).or_default().push(tenant_id);
+            fingerprint_map
+                .entry(fingerprint)
+                .or_default()
+                .push(tenant_id);
         }
 
         if fingerprint_map.is_empty() {
             continue;
         }
 
-        let drifted_ids: BTreeSet<String> =
-            fingerprint_map.values().flatten().cloned().collect();
+        let drifted_ids: BTreeSet<String> = fingerprint_map.values().flatten().cloned().collect();
         let baseline_tenants: Vec<String> = all_tenant_ids
             .iter()
             .filter(|id| !drifted_ids.contains(*id))
@@ -114,9 +124,19 @@ fn build_module_sections(
         let non_baseline = order_drift_groups(fingerprint_map);
 
         let mut rows = Vec::new();
-        rows.push(make_row(version_label(0, true), &baseline_tenants, ambiguous_dbs, true));
+        rows.push(make_row(
+            version_label(0, true),
+            &baseline_tenants,
+            ambiguous_dbs,
+            true,
+        ));
         for (i, (_fp, tenants)) in non_baseline.iter().enumerate() {
-            rows.push(make_row(version_label(i + 1, false), tenants, ambiguous_dbs, false));
+            rows.push(make_row(
+                version_label(i + 1, false),
+                tenants,
+                ambiguous_dbs,
+                false,
+            ));
         }
 
         if non_baseline.is_empty() {
@@ -163,15 +183,17 @@ fn build_table_sections(
                     diff::TableChangeKind::Added {} => "__ADDED__".to_string(),
                 },
             };
-            fingerprint_map.entry(fingerprint).or_default().push(tenant_id);
+            fingerprint_map
+                .entry(fingerprint)
+                .or_default()
+                .push(tenant_id);
         }
 
         if fingerprint_map.is_empty() {
             continue;
         }
 
-        let drifted_ids: BTreeSet<String> =
-            fingerprint_map.values().flatten().cloned().collect();
+        let drifted_ids: BTreeSet<String> = fingerprint_map.values().flatten().cloned().collect();
         let baseline_tenants: Vec<String> = all_tenant_ids
             .iter()
             .filter(|id| !drifted_ids.contains(*id))
@@ -181,9 +203,19 @@ fn build_table_sections(
         let non_baseline = order_drift_groups(fingerprint_map);
 
         let mut rows = Vec::new();
-        rows.push(make_row(version_label(0, true), &baseline_tenants, ambiguous_dbs, true));
+        rows.push(make_row(
+            version_label(0, true),
+            &baseline_tenants,
+            ambiguous_dbs,
+            true,
+        ));
         for (i, (_fp, tenants)) in non_baseline.iter().enumerate() {
-            rows.push(make_row(version_label(i + 1, false), tenants, ambiguous_dbs, false));
+            rows.push(make_row(
+                version_label(i + 1, false),
+                tenants,
+                ambiguous_dbs,
+                false,
+            ));
         }
 
         if non_baseline.is_empty() {
@@ -209,7 +241,11 @@ pub fn print_version_summary(reports: &[TenantReport], out: &mut dyn Write) -> a
         .collect();
 
     let mut sections: Vec<ObjectSection> = Vec::new();
-    sections.extend(build_table_sections(&all_tenant_ids, &ambiguous_dbs, reports));
+    sections.extend(build_table_sections(
+        &all_tenant_ids,
+        &ambiguous_dbs,
+        reports,
+    ));
     sections.extend(build_module_sections(
         &all_tenant_ids,
         &ambiguous_dbs,

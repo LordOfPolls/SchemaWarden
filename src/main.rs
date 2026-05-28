@@ -1,9 +1,10 @@
 mod diff;
 mod fetcher;
 mod schema;
-mod std_display;
 mod sql_normalise;
+mod std_display;
 
+use crate::std_display::print_version_summary;
 use anyhow::Context;
 use clap::Parser;
 use futures::stream::{self, StreamExt, TryStreamExt};
@@ -19,7 +20,6 @@ use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tracing::{Instrument, debug, error, info, info_span, warn};
 use tracing_subscriber::EnvFilter;
-use crate::std_display::print_version_summary;
 
 const TENANT_LIST_MAX: usize = 80;
 
@@ -188,8 +188,8 @@ fn init_tracing(verbose: bool) {
     if !verbose {
         return;
     }
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("schema_warden=debug"));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("schema_warden=debug"));
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_target(false)
@@ -218,7 +218,9 @@ async fn main() -> anyhow::Result<()> {
     init_tracing(args.verbose);
 
     if args.format == OutputFormat::Json && args.output.is_none() {
-        eprintln!("error: JSON output requires --output <file>. Omit --format or use --format text for console output.");
+        eprintln!(
+            "error: JSON output requires --output <file>. Omit --format or use --format text for console output."
+        );
         std::process::exit(2);
     }
 
@@ -305,9 +307,7 @@ async fn main() -> anyhow::Result<()> {
                         e
                     })?;
                 if tenant.tables.is_empty() && filter_ref.is_none() {
-                    warn!(
-                        "tenant returned zero tables; may indicate missing permissions"
-                    );
+                    warn!("tenant returned zero tables; may indicate missing permissions");
                 }
                 let drift = diff::diff(baseline, &tenant);
                 let is_clean = drift.is_clean();
@@ -364,7 +364,7 @@ async fn main() -> anyhow::Result<()> {
                 })
                 .collect()
         };
-        
+
         let ambiguous_dbs = std_display::compute_ambiguous_dbs(&reports);
         let mut fp_groups: BTreeMap<String, Vec<(&TenantReport, &diff::ModuleChange)>> =
             BTreeMap::new();
@@ -408,10 +408,7 @@ async fn main() -> anyhow::Result<()> {
                 "baseline: {}/{} ({})",
                 baseline_host.hostname, args.baseline_db, object_key
             );
-            let header_target = format!(
-                "Version {version_letter}: {tenant_list} ({})",
-                object_key
-            );
+            let header_target = format!("Version {version_letter}: {tenant_list} ({})", object_key);
 
             let Some(patch) =
                 diff::render_module_patch(bl_text, tgt_text, &header_baseline, &header_target)
@@ -419,11 +416,7 @@ async fn main() -> anyhow::Result<()> {
                 continue;
             };
 
-            let filename = format!(
-                "Version_{}__{}.diff",
-                version_letter,
-                sanitize(&object_key),
-            );
+            let filename = format!("Version_{}__{}.diff", version_letter, sanitize(&object_key),);
             let path = diff_dir.join(&filename);
             std::fs::write(&path, &patch)
                 .with_context(|| format!("Failed to write diff file: {}", path.display()))?;

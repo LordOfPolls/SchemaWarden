@@ -34,19 +34,28 @@ pub async fn fetch_schema(
     fetch_indexes(client, &mut schema.tables, filter)
         .await
         .context("fetching indexes")?;
-    debug!(elapsed_ms = step.elapsed().as_millis() as u64, "fetched indexes");
+    debug!(
+        elapsed_ms = step.elapsed().as_millis() as u64,
+        "fetched indexes"
+    );
 
     let step = Instant::now();
     fetch_foreign_keys(client, &mut schema.tables, filter)
         .await
         .context("fetching foreign keys")?;
-    debug!(elapsed_ms = step.elapsed().as_millis() as u64, "fetched foreign keys");
+    debug!(
+        elapsed_ms = step.elapsed().as_millis() as u64,
+        "fetched foreign keys"
+    );
 
     let step = Instant::now();
     fetch_check_constraints(client, &mut schema.tables, filter)
         .await
         .context("fetching check constraints")?;
-    debug!(elapsed_ms = step.elapsed().as_millis() as u64, "fetched check constraints");
+    debug!(
+        elapsed_ms = step.elapsed().as_millis() as u64,
+        "fetched check constraints"
+    );
 
     let step = Instant::now();
     fetch_sql_modules(client, &mut schema, filter)
