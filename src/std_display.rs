@@ -233,9 +233,16 @@ fn build_table_sections(
 }
 
 pub fn print_version_summary(reports: &[TenantReport], out: &mut dyn Write) -> anyhow::Result<()> {
-    let ambiguous_dbs = compute_ambiguous_dbs(reports);
+    let failed: Vec<&TenantReport> = reports.iter().filter(|r| r.error.is_some()).collect();
+    let succeeded: Vec<TenantReport> = reports
+        .iter()
+        .filter(|r| r.error.is_none())
+        .cloned()
+        .collect();
 
-    let all_tenant_ids: Vec<String> = reports
+    let ambiguous_dbs = compute_ambiguous_dbs(&succeeded);
+
+    let all_tenant_ids: Vec<String> = succeeded
         .iter()
         .map(|r| format!("{}:{}", r.host, r.database))
         .collect();
@@ -244,38 +251,38 @@ pub fn print_version_summary(reports: &[TenantReport], out: &mut dyn Write) -> a
     sections.extend(build_table_sections(
         &all_tenant_ids,
         &ambiguous_dbs,
-        reports,
+        &succeeded,
     ));
     sections.extend(build_module_sections(
         &all_tenant_ids,
         &ambiguous_dbs,
-        reports,
+        &succeeded,
         "VIEW",
         |r| &r.drift.views,
     ));
     sections.extend(build_module_sections(
         &all_tenant_ids,
         &ambiguous_dbs,
-        reports,
+        &succeeded,
         "PROCEDURE",
         |r| &r.drift.procedures,
     ));
     sections.extend(build_module_sections(
         &all_tenant_ids,
         &ambiguous_dbs,
-        reports,
+        &succeeded,
         "FUNCTION",
         |r| &r.drift.functions,
     ));
     sections.extend(build_module_sections(
         &all_tenant_ids,
         &ambiguous_dbs,
-        reports,
+        &succeeded,
         "TRIGGER",
         |r| &r.drift.triggers,
     ));
 
-    if sections.is_empty() {
+    if sections.is_empty() && failed.is_empty() {
         writeln!(
             out,
             "All {} tenant(s) match baseline. No schema drift detected.",
@@ -284,26 +291,54 @@ pub fn print_version_summary(reports: &[TenantReport], out: &mut dyn Write) -> a
         return Ok(());
     }
 
-    for (i, section) in sections.iter().enumerate() {
-        if i > 0 {
-            writeln!(out)?;
-        }
-        writeln!(out, "{} | {}", section.type_label, section.object_key)?;
+    if !sections.is_empty() {
+        for (i, section) in sections.iter().enumerate() {
+            if i > 0 {
+                writeln!(out)?;
+            }
+            writeln!(out, "{} | {}", section.type_label, section.object_key)?;
 
+            let mut table = Table::new();
+            table.load_preset(comfy_table::presets::ASCII_NO_BORDERS);
+            table.set_header(vec!["Version", "Tenants", "Total DBs", "Matches Baseline"]);
+
+            for (label, tenant_str, count, is_baseline) in &section.rows {
+                let db_word = if *count == 1 { "db" } else { "dbs" };
+                table.add_row(vec![
+                    Cell::new(label),
+                    Cell::new(tenant_str),
+                    Cell::new(format!("{count} {db_word}")),
+                    Cell::new(if *is_baseline { "yes" } else { "no" }),
+                ]);
+            }
+
+            writeln!(out, "{table}")?;
+        }
+    } else {
+        writeln!(
+            out,
+            "All {} reachable tenant(s) match baseline. No schema drift detected.",
+            succeeded.len()
+        )?;
+    }
+
+    if !failed.is_empty() {
+        writeln!(out)?;
+        writeln!(
+            out,
+            "SCAN ERRORS | {} tenant(s) could not be scanned",
+            failed.len()
+        )?;
         let mut table = Table::new();
         table.load_preset(comfy_table::presets::ASCII_NO_BORDERS);
-        table.set_header(vec!["Version", "Tenants", "Total DBs", "Matches Baseline"]);
-
-        for (label, tenant_str, count, is_baseline) in &section.rows {
-            let db_word = if *count == 1 { "db" } else { "dbs" };
+        table.set_header(vec!["Host", "Database", "Error"]);
+        for r in &failed {
             table.add_row(vec![
-                Cell::new(label),
-                Cell::new(tenant_str),
-                Cell::new(format!("{count} {db_word}")),
-                Cell::new(if *is_baseline { "yes" } else { "no" }),
+                Cell::new(&r.host),
+                Cell::new(&r.database),
+                Cell::new(r.error.as_deref().unwrap_or("")),
             ]);
         }
-
         writeln!(out, "{table}")?;
     }
 

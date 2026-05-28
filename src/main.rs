@@ -196,12 +196,14 @@ fn init_tracing(verbose: bool) {
         .init();
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct TenantReport {
     host: String,
     database: String,
     is_clean: bool,
     drift: diff::SchemaDiff,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 fn parse_object_filter(s: &str) -> (String, String) {
@@ -296,44 +298,74 @@ async fn main() -> anyhow::Result<()> {
             let span = info_span!("tenant", host = %host.hostname, db = %db);
             async move {
                 let tenant_started = Instant::now();
-                let mut client = connect(&host, &db, args).await.map_err(|e| {
-                    error!(error = %e, "tenant connect failed");
-                    e
-                })?;
-                let tenant = fetcher::fetch_schema(&mut client, &db, filter_ref)
-                    .await
-                    .map_err(|e| {
-                        error!(error = %e, "tenant schema fetch failed");
+                let scan_result: anyhow::Result<TenantReport> = async {
+                    let mut client = connect(&host, &db, args).await.map_err(|e| {
+                        error!(error = %e, "tenant connect failed");
                         e
                     })?;
-                if tenant.tables.is_empty() && filter_ref.is_none() {
-                    warn!("tenant returned zero tables; may indicate missing permissions");
+                    let tenant = fetcher::fetch_schema(&mut client, &db, filter_ref)
+                        .await
+                        .map_err(|e| {
+                            error!(error = %e, "tenant schema fetch failed");
+                            e
+                        })?;
+                    if tenant.tables.is_empty() && filter_ref.is_none() {
+                        warn!("tenant returned zero tables; may indicate missing permissions");
+                    }
+                    let drift = diff::diff(baseline, &tenant);
+                    let is_clean = drift.is_clean();
+                    let module_changes = drift.views.len()
+                        + drift.procedures.len()
+                        + drift.functions.len()
+                        + drift.triggers.len();
+                    info!(
+                        clean = is_clean,
+                        table_changes = drift.tables.len(),
+                        module_changes,
+                        elapsed_ms = tenant_started.elapsed().as_millis() as u64,
+                        "tenant scan complete"
+                    );
+                    Ok(TenantReport {
+                        host: host.hostname.clone(),
+                        database: db.clone(),
+                        is_clean,
+                        drift,
+                        error: None,
+                    })
                 }
-                let drift = diff::diff(baseline, &tenant);
-                let is_clean = drift.is_clean();
-                let module_changes = drift.views.len()
-                    + drift.procedures.len()
-                    + drift.functions.len()
-                    + drift.triggers.len();
-                info!(
-                    clean = is_clean,
-                    table_changes = drift.tables.len(),
-                    module_changes,
-                    elapsed_ms = tenant_started.elapsed().as_millis() as u64,
-                    "tenant scan complete"
-                );
-                Ok::<TenantReport, anyhow::Error>(TenantReport {
-                    host: host.hostname.clone(),
-                    database: db.clone(),
-                    is_clean,
-                    drift,
-                })
+                .await;
+
+                match scan_result {
+                    Ok(report) => report,
+                    Err(e) => {
+                        error!(
+                            error = %e,
+                            elapsed_ms = tenant_started.elapsed().as_millis() as u64,
+                            "tenant scan failed"
+                        );
+                        TenantReport {
+                            host: host.hostname.clone(),
+                            database: db.clone(),
+                            is_clean: false,
+                            drift: diff::SchemaDiff {
+                                baseline_db: String::new(),
+                                target_db: db.clone(),
+                                tables: vec![],
+                                views: vec![],
+                                procedures: vec![],
+                                functions: vec![],
+                                triggers: vec![],
+                            },
+                            error: Some(e.to_string()),
+                        }
+                    }
+                }
             }
             .instrument(span)
         })
         .buffer_unordered(concurrency)
-        .try_collect()
-        .await?;
+        .collect()
+        .await;
 
     reports.sort_by(|a, b| a.host.cmp(&b.host).then(a.database.cmp(&b.database)));
 
@@ -451,13 +483,18 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let drifted = reports.iter().filter(|r| !r.is_clean).count();
-    let clean = reports.len() - drifted;
-    let exit_code = if drifted > 0 { 1 } else { 0 };
+    let failed = reports.iter().filter(|r| r.error.is_some()).count();
+    let drifted = reports
+        .iter()
+        .filter(|r| !r.is_clean && r.error.is_none())
+        .count();
+    let clean = reports.len() - drifted - failed;
+    let exit_code = if drifted > 0 || failed > 0 { 1 } else { 0 };
     info!(
         scanned = reports.len(),
         clean,
         drifted,
+        failed,
         elapsed_s = started.elapsed().as_secs_f64(),
         exit = exit_code,
         "scan complete"
