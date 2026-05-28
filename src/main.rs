@@ -50,20 +50,21 @@ impl FromStr for ServerHost {
     type Err = anyhow::Error;
 
     fn from_str(host: &str) -> Result<Self, Self::Err> {
-        let mut host = host.replace(':', ";");
-        let mut port = 1433;
-
-        if let Some((host_part, port_part)) = host.split_once(';') {
-            port = port_part
-                .parse()
-                .with_context(|| format!("Invalid port in server host: {host}"))?;
-            host = host_part.to_string();
+        match host.split_once(':') {
+            Some((hostname, port_part)) => {
+                let port = port_part
+                    .parse()
+                    .with_context(|| format!("Invalid port in server host: {host}"))?;
+                Ok(Self {
+                    hostname: hostname.to_string(),
+                    port: Some(port),
+                })
+            }
+            None => Ok(Self {
+                hostname: host.to_string(),
+                port: None,
+            }),
         }
-
-        Ok(Self {
-            hostname: host,
-            port: Some(port),
-        })
     }
 }
 
