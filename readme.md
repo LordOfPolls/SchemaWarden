@@ -54,11 +54,11 @@ Options:
   -c, --concurrency <CONCURRENCY>
           Maximum number of tenant databases to scan in parallel [env: SCHEMA_WARDEN_CONCURRENCY=] [default: 4]
       --format <FORMAT>
-          Output format [default: json] [possible values: text, json]
+          Output format [default: text] [possible values: text, json]
   -o, --output <OUTPUT>
           Write output to this file instead of stdout [env: SCHEMA_WARDEN_OUTPUT=]
       --diff-dir <DIFF_DIR>
-          Write a unified-diff file per drifted tenant. Requires --object pointing at a module-type object [env: SCHEMA_WARDEN_DIFF_DIR=]
+          Write a unified-diff file per unique schema version. Requires --object pointing at a module-type object [env: SCHEMA_WARDEN_DIFF_DIR=]
   -h, --help
           Print help
   -V, --version
@@ -67,6 +67,9 @@ Options:
 
 Most flags have an environment variable equivalent. 
 A `.env` file in the working directory is auto-loaded.
+
+> [!TIP]
+> Prefer supplying the password via `SCHEMA_WARDEN_DB_PWD` (or a `.env` file) rather than `-p`. Command-line arguments are visible to other users in the process list and tend to land in shell history.
 
 ## Examples
 
@@ -96,35 +99,48 @@ schema-warden ... --object dbo.Invoices
 ```
 Useful when you've just shipped a migration and want to confirm it landed everywhere.
 
-**Dump per-tenant patch files for a drifted view or procedure:**
+**Dump patch files for a drifted view or procedure:**
 ```bash
 schema-warden ... --object dbo.usp_BillRun --diff-dir ./drift-patches
 ```
-Each drifted tenant gets a `host__database__schema.object.diff` file containing a unified diff between baseline and tenant. Open it in your editor; apply it with `patch` if you trust it.
+One `.diff` file is written per unique schema version found across all tenants, named after the version label — e.g. `Version_B__dbo__usp_BillRun.diff`. The header inside the file lists all tenant databases on that version:
+```
+baseline: sql-reference/BaselineDB (dbo.usp_BillRun)
+Version B: TenantD, TenantE (dbo.usp_BillRun)
+```
+Version labels match those shown in the summary table. Open the file in your editor; apply it with `patch` if you trust it.
 
 > [!NOTE]
 > `--diff-dir` only works for modules (views, procedures, functions, triggers) — tables don't have a single body of SQL to diff.
 
 ## Output
 
-Default output is JSON, suitable for piping into `jq` or storing as a CI artifact:
+Default output is a version-grouped summary table. For each object that has drifted in at least one tenant, the table shows which tenants are on each schema version and whether they match the baseline:
 
+```
+PROCEDURE | dbo.usp_BillRun
+ Version              | Tenants                        | Total DBs | Matches Baseline
+----------------------+--------------------------------+-----------+-----------------
+ Version A (baseline) | TenantA, TenantB, TenantC ...  | 47 dbs    | yes
+ Version B            | TenantD, TenantE               |  2 dbs    | no
+
+TABLE | dbo.Invoices
+ Version              | Tenants                        | Total DBs | Matches Baseline
+----------------------+--------------------------------+-----------+-----------------
+ Version A (baseline) | TenantA, TenantB ...           | 48 dbs    | yes
+ Version B            | TenantD                        |  1 db     | no
+```
+
+If all tenants match, a single line is printed instead.
+
+Hostnames are included in the tenant list only when the same database name exists on more than one host.
+
+**JSON output** is available for programmatic consumption but requires `--output` to write to a file — it is not printed to stdout:
 ```bash
-schema-warden ... | jq '.[] | select(.is_clean == false) | .database'
+schema-warden ... --format json --output drift.json
 ```
 
-
-```
-sql-01:TenantA: no drift detected
-sql-01:TenantB
-  Tables:
-    ~ dbo.Invoices
-        + column "Notes" (nvarchar(max), nullable)
-  Procedures:
-    ~ dbo.usp_BillRun (definition changed)
-```
-
-Schema Warden exits `0` if every tenant matches the baseline, `1` if any drift was found, and non-zero on connection or query errors. 
+Schema Warden exits `0` if every tenant matches the baseline, `1` if any drift was found, and non-zero on connection or query errors.
 Hook that into your CI step and you'll get a failed build the moment something diverges.
 
 ---

@@ -235,3 +235,13 @@ pub enum ModuleChangeKind {
         target: String,
     },
 }
+
+impl ModuleChangeKind {
+    pub fn fingerprint(&self) -> String {
+        match self {
+            Self::DefinitionChanged { target, .. } => target.clone(),
+            Self::Removed { .. } => "__REMOVED__".to_string(),
+            Self::Added { definition } => definition.clone(),
+        }
+    }
+}

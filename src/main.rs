@@ -1,11 +1,13 @@
 mod diff;
 mod fetcher;
 mod schema;
+mod std_display;
 
 use anyhow::Context;
 use clap::Parser;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
@@ -16,11 +18,25 @@ use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tracing::{Instrument, debug, error, info, info_span, warn};
 use tracing_subscriber::EnvFilter;
+use crate::std_display::print_version_summary;
 
-#[derive(clap::ValueEnum, Clone, Debug, Default)]
+const TENANT_LIST_MAX: usize = 80;
+
+pub fn get_version_label(version_idx: usize) -> String {
+    let letter = (b'A' + (version_idx % 26) as u8) as char;
+    let cycle = version_idx / 26;
+
+    if cycle == 0 {
+        letter.to_string()
+    } else {
+        format!("{}{}", letter, cycle)
+    }
+}
+
+#[derive(clap::ValueEnum, Clone, Debug, Default, PartialEq)]
 enum OutputFormat {
-    Text,
     #[default]
+    Text,
     Json,
 }
 
@@ -199,6 +215,11 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     init_tracing(args.verbose);
 
+    if args.format == OutputFormat::Json && args.output.is_none() {
+        eprintln!("error: JSON output requires --output <file>. Omit --format or use --format text for console output.");
+        std::process::exit(2);
+    }
+
     let started = Instant::now();
     let filter = args.object.as_deref().map(parse_object_filter);
     let filter_ref = filter.as_ref().map(|(s, n)| (s.as_str(), n.as_str()));
@@ -341,9 +362,12 @@ async fn main() -> anyhow::Result<()> {
                 })
                 .collect()
         };
-
+        
+        let ambiguous_dbs = std_display::compute_ambiguous_dbs(&reports);
+        let mut fp_groups: BTreeMap<String, Vec<(&TenantReport, &diff::ModuleChange)>> =
+            BTreeMap::new();
         for report in &reports {
-            let module_change = report
+            let mc = report
                 .drift
                 .views
                 .iter()
@@ -351,8 +375,18 @@ async fn main() -> anyhow::Result<()> {
                 .chain(report.drift.functions.iter())
                 .chain(report.drift.triggers.iter())
                 .next();
+            let Some(mc) = mc else { continue };
+            fp_groups
+                .entry(mc.kind.fingerprint())
+                .or_default()
+                .push((report, mc));
+        }
 
-            let Some(mc) = module_change else { continue };
+        let sorted_groups = std_display::order_drift_groups(fp_groups);
+
+        for (version_idx, (_fp, group)) in sorted_groups.iter().enumerate() {
+            let version_letter = get_version_label(version_idx + 1);
+            let (_report, mc) = group[0];
 
             let (bl_text, tgt_text) = match &mc.kind {
                 diff::ModuleChangeKind::DefinitionChanged { baseline, target } => {
@@ -362,13 +396,19 @@ async fn main() -> anyhow::Result<()> {
                 diff::ModuleChangeKind::Removed { definition } => (Some(definition.as_str()), None),
             };
 
+            let tenant_ids: Vec<String> = group
+                .iter()
+                .map(|(r, _)| format!("{}:{}", r.host, r.database))
+                .collect();
+            let tenant_list = std_display::truncate_tenant_list(&tenant_ids, &ambiguous_dbs);
+
             let header_baseline = format!(
                 "baseline: {}/{} ({})",
                 baseline_host.hostname, args.baseline_db, object_key
             );
             let header_target = format!(
-                "target:   {}/{} ({})",
-                report.host, report.database, object_key
+                "Version {version_letter}: {tenant_list} ({})",
+                object_key
             );
 
             let Some(patch) =
@@ -378,9 +418,8 @@ async fn main() -> anyhow::Result<()> {
             };
 
             let filename = format!(
-                "{}__{}__{}.diff",
-                sanitize(&report.host),
-                sanitize(&report.database),
+                "Version_{}__{}.diff",
+                version_letter,
                 sanitize(&object_key),
             );
             let path = diff_dir.join(&filename);
@@ -409,13 +448,7 @@ async fn main() -> anyhow::Result<()> {
 
     match args.format {
         OutputFormat::Text => {
-            for r in &reports {
-                if r.is_clean {
-                    writeln!(out, "{}:{}: no drift detected", r.host, r.database)?;
-                } else {
-                    writeln!(out, "{}:{}\n{}", r.host, r.database, r.drift)?;
-                }
-            }
+            print_version_summary(&reports, &mut out)?;
         }
         OutputFormat::Json => {
             serde_json::to_writer_pretty(&mut out, &reports)?;
